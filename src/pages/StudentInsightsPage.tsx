@@ -51,6 +51,7 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
     gemini:       { label: "Gemini Flash",      color: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
     "rule-based": { label: "Smart Analysis",    color: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
 };
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 const fade = (i = 0) => ({
     initial: { opacity: 0, y: 20 },
@@ -83,7 +84,7 @@ export default function StudentInsightsPage() {
         if (!admNo) return;
         setCardsLoading(true);
         try {
-            const r = await fetch(`http://localhost:5000/api/ai/insights/${admNo}`);
+            const r = await fetch(`${API_BASE}/api/ai/insights/${admNo}`);
             const d = await r.json();
             if (d.success) { setCards(d.data); setSource(d.source); }
         } catch { /* silent */ }
@@ -115,7 +116,7 @@ export default function StudentInsightsPage() {
         setChatLoading(true);
         try {
             const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
-            const r = await fetch("http://localhost:5000/api/ai/chat", {
+            const r = await fetch(`${API_BASE}/api/ai/chat`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ admission_number: admNo, message: msg, history }),
@@ -134,7 +135,7 @@ export default function StudentInsightsPage() {
         setPlanOpen(true);
         setPlan("");
         try {
-            const r = await fetch(`http://localhost:5000/api/ai/study-plan/${admNo}?_ts=${Date.now()}`, {
+            const r = await fetch(`${API_BASE}/api/ai/study-plan/${admNo}?_ts=${Date.now()}`, {
                 cache: "no-store",
                 headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
             });
