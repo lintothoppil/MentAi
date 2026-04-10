@@ -1,0 +1,81 @@
+--------------------------------------------------
+Student: A24000 | Status: Improving
+Det Risk: 44.0 | ML Prob: 0.0%
+Base Hours: 14 | Target Allocated: 14.0 | Boost: None
+  Cloud Computing    : 6.2 hrs | Priority: Critical | Weakness: 0.45 | Avg: 49.5 | Slope: 21.9 | Fails: 1
+  Data Mining        : 2.9 hrs | Priority: Stable   | Weakness: 0.21 | Avg: 57.1 | Slope: 20.0 | Fails: 0
+  DAA                : 2.6 hrs | Priority: Stable   | Weakness: 0.19 | Avg: 62.0 | Slope: 13.4 | Fails: 0
+  IoT                : 2.3 hrs | Priority: Stable   | Weakness: 0.17 | Avg: 66.5 | Slope: 22.1 | Fails: 0
+--------------------------------------------------
+Student: A24003 | Status: Improving
+Det Risk: 0.0 | ML Prob: 0.0%
+Base Hours: 14 | Target Allocated: 14.0 | Boost: None
+  IoT                : 4.0 hrs | Priority: Stable   | Weakness: 0.24 | Avg: 51.2 | Slope: 10.6 | Fails: 0
+  DAA                : 3.4 hrs | Priority: Stable   | Weakness: 0.21 | Avg: 57.9 | Slope: 12.0 | Fails: 0
+  Data Mining        : 3.3 hrs | Priority: Stable   | Weakness: 0.20 | Avg: 59.3 | Slope: 23.3 | Fails: 0
+  Cloud Computing    : 3.3 hrs | Priority: Stable   | Weakness: 0.20 | Avg: 60.0 | Slope: 20.8 | Fails: 0
+--------------------------------------------------
+Student: A24033 | Status: Improving
+Det Risk: 48.0 | ML Prob: 0.0%
+Base Hours: 14 | Target Allocated: 14.0 | Boost: None
+  Data Mining        : 4.7 hrs | Priority: Critical | Weakness: 0.47 | Avg: 46.2 | Slope: 16.3 | Fails: 1
+  Cloud Computing    : 4.6 hrs | Priority: Moderate | Weakness: 0.47 | Avg: 46.5 | Slope: 19.0 | Fails: 1
+  IoT                : 2.4 hrs | Priority: Stable   | Weakness: 0.24 | Avg: 51.9 | Slope: 19.8 | Fails: 0
+  DAA                : 2.3 hrs | Priority: Stable   | Weakness: 0.23 | Avg: 53.1 | Slope: 17.7 | Fails: 0
+--------------------------------------------------
+Student: A24002 | Status: Stable
+Det Risk: 0.0 | ML Prob: 0.0%
+Base Hours: 14 | Target Allocated: 14.1 | Boost: None
+  Cloud Computing    : 3.9 hrs | Priority: Stable   | Weakness: 0.19 | Avg: 63.9 | Slope: -2.6 | Fails: 0
+  Data Mining        : 3.8 hrs | Priority: Stable   | Weakness: 0.18 | Avg: 64.1 | Slope: -1.2 | Fails: 0
+  DAA                : 3.2 hrs | Priority: Stable   | Weakness: 0.15 | Avg: 69.3 | Slope: 4.2 | Fails: 0
+  IoT                : 3.2 hrs | Priority: Stable   | Weakness: 0.15 | Avg: 70.2 | Slope: -1.3 | Fails: 0
+--------------------------------------------------
+Student: A24005 | Status: Stable
+Det Risk: 0.0 | ML Prob: 0.0%
+Base Hours: 14 | Target Allocated: 14.0 | Boost: None
+  Cloud Computing    : 3.8 hrs | Priority: Stable   | Weakness: 0.20 | Avg: 61.0 | Slope: -2.1 | Fails: 0
+  Data Mining        : 3.6 hrs | Priority: Stable   | Weakness: 0.19 | Avg: 61.8 | Slope: 1.3 | Fails: 0
+  DAA                : 3.5 hrs | Priority: Stable   | Weakness: 0.19 | Avg: 63.7 | Slope: -1.7 | Fails: 0
+  IoT                : 3.1 hrs | Priority: Stable   | Weakness: 0.16 | Avg: 69.9 | Slope: -3.6 | Fails: 0
+--------------------------------------------------
+Student: A24006 | Status: Stable
+Det Risk: 4.000000000000001 | ML Prob: 0.0%
+Base Hours: 14 | Target Allocated: 14.0 | Boost: None
+  IoT                : 5.5 hrs | Priority: Critical | Weakness: 0.49 | Avg: 42.7 | Slope: 11.0 | Fails: 1
+  DAA                : 3.0 hrs | Priority: Moderate | Weakness: 0.26 | Avg: 47.3 | Slope: 13.8 | Fails: 0
+  Cloud Computing    : 2.8 hrs | Priority: Stable   | Weakness: 0.24 | Avg: 51.4 | Slope: 12.2 | Fails: 0
+  Data Mining        : 2.7 hrs | Priority: Stable   | Weakness: 0.24 | Avg: 51.6 | Slope: 16.9 | Fails: 0
+--------------------------------------------------
+Student: A24001 | Status: Declining
+Det Risk: 80.0 | ML Prob: 0.0%
+Base Hours: 14 | Target Allocated: 16.1 | Boost: Deterministic Declining
+  Data Mining        : 4.4 hrs | Priority: Moderate | Weakness: 0.27 | Avg: 61.6 | Slope: -26.0 | Fails: 0
+  Cloud Computing    : 4.1 hrs | Priority: Moderate | Weakness: 0.26 | Avg: 64.1 | Slope: -25.3 | Fails: 0
+  IoT                : 4.1 hrs | Priority: Moderate | Weakness: 0.25 | Avg: 64.1 | Slope: -24.9 | Fails: 0
+  DAA                : 3.5 hrs | Priority: Stable   | Weakness: 0.21 | Avg: 71.2 | Slope: -22.9 | Fails: 0
+--------------------------------------------------
+Student: A24004 | Status: Declining
+Det Risk: 80.0 | ML Prob: 0.0%
+Base Hours: 14 | Target Allocated: 16.1 | Boost: Deterministic Declining
+  Data Mining        : 5.5 hrs | Priority: Moderate | Weakness: 0.31 | Avg: 55.2 | Slope: -27.0 | Fails: 0
+  IoT                : 3.9 hrs | Priority: Stable   | Weakness: 0.22 | Avg: 70.2 | Slope: -22.9 | Fails: 0
+  Cloud Computing    : 3.4 hrs | Priority: Stable   | Weakness: 0.19 | Avg: 75.1 | Slope: -22.1 | Fails: 0
+  DAA                : 3.3 hrs | Priority: Stable   | Weakness: 0.18 | Avg: 72.8 | Slope: -16.1 | Fails: 0
+--------------------------------------------------
+Student: A24007 | Status: Declining
+Det Risk: 80.0 | ML Prob: 0.0%
+Base Hours: 14 | Target Allocated: 16.1 | Boost: Deterministic Declining
+  Data Mining        : 5.4 hrs | Priority: Moderate | Weakness: 0.30 | Avg: 53.8 | Slope: -23.4 | Fails: 0
+  DAA                : 4.0 hrs | Priority: Stable   | Weakness: 0.23 | Avg: 67.5 | Slope: -21.3 | Fails: 0
+  IoT                : 3.5 hrs | Priority: Stable   | Weakness: 0.20 | Avg: 72.5 | Slope: -20.7 | Fails: 0
+  Cloud Computing    : 3.2 hrs | Priority: Stable   | Weakness: 0.18 | Avg: 76.0 | Slope: -19.5 | Fails: 0
+--------------------------------------------------
+Student: A24010 | Status: Declining
+Det Risk: 80.0 | ML Prob: 0.0%
+Base Hours: 14 | Target Allocated: 16.0 | Boost: Deterministic Declining
+  DAA                : 4.5 hrs | Priority: Moderate | Weakness: 0.28 | Avg: 58.6 | Slope: -23.1 | Fails: 0
+  Cloud Computing    : 4.3 hrs | Priority: Moderate | Weakness: 0.27 | Avg: 63.6 | Slope: -27.8 | Fails: 0
+  IoT                : 3.8 hrs | Priority: Stable   | Weakness: 0.23 | Avg: 63.2 | Slope: -16.5 | Fails: 0
+  Data Mining        : 3.4 hrs | Priority: Stable   | Weakness: 0.21 | Avg: 74.9 | Slope: -28.5 | Fails: 0
+--------------------------------------------------

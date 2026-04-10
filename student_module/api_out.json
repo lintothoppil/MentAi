@@ -1,0 +1,46 @@
+{
+  "data": {
+    "booster_applied": "None",
+    "deterministic_risk": 44.0,
+    "id": 1,
+    "ml_probability": 0.0,
+    "subjects": [
+      {
+        "allocated_hours": 6.2,
+        "completed_hours": 2.0,
+        "id": 1,
+        "priority": "Critical",
+        "subject_id": 2,
+        "subject_name": "Cloud Computing"
+      },
+      {
+        "allocated_hours": 2.9,
+        "completed_hours": 0,
+        "id": 2,
+        "priority": "Stable",
+        "subject_id": 1,
+        "subject_name": "Data Mining"
+      },
+      {
+        "allocated_hours": 2.6,
+        "completed_hours": 0,
+        "id": 3,
+        "priority": "Stable",
+        "subject_id": 4,
+        "subject_name": "DAA"
+      },
+      {
+        "allocated_hours": 2.3,
+        "completed_hours": 0,
+        "id": 4,
+        "priority": "Stable",
+        "subject_id": 3,
+        "subject_name": "IoT"
+      }
+    ],
+    "total_hours": 14.0,
+    "week_end": "2026-03-01",
+    "week_start": "2026-02-23"
+  },
+  "success": true
+}

@@ -1,0 +1,87 @@
+--- Faculty Members ---
+ID: 1 | Name: Dr. Smith | Username: dr_smith | Dept: CSE | Desig: Senior Professor
+ID: 2 | Name: Arun S Nair | Username: arun.s.nair | Dept: Computer Science and Engineering (CSE) | Desig: Assistant Professor
+ID: 3 | Name: Meera Joseph | Username: meera.joseph | Dept: Computer Science and Engineering (CSE) | Desig: Assistant Professor
+ID: 4 | Name: Vishnu Raj | Username: vishnu.raj | Dept: Computer Science and Engineering (CSE) | Desig: Associate Professor
+ID: 5 | Name: Anjali Menon | Username: anjali.menon | Dept: Computer Science and Engineering (CSE) | Desig: Assistant Professor
+ID: 6 | Name: Rahul Krishnan | Username: rahul.krishnan | Dept: Computer Science and Engineering (CSE) | Desig: Assistant Professor
+ID: 7 | Name: Sneha Varghese | Username: sneha.varghese | Dept: Computer Science and Engineering (CSE) | Desig: Associate Professor
+ID: 8 | Name: Abhilash Kumar | Username: abhilash.kumar | Dept: Computer Science and Engineering (CSE) | Desig: Assistant Professor
+ID: 9 | Name: Divya Prasad | Username: divya.prasad | Dept: Computer Science and Engineering (CSE) | Desig: Professor
+ID: 10 | Name: Linto Mathew | Username: linto.mathew | Dept: Department of Computer Applications | Desig: Assistant Professor
+ID: 11 | Name: Reshma Babu | Username: reshma.babu | Dept: Department of Computer Applications | Desig: Assistant Professor
+ID: 12 | Name: Nikhil Thomas | Username: nikhil.thomas | Dept: Department of Computer Applications | Desig: Associate Professor
+ID: 13 | Name: Athira S | Username: athira.s | Dept: Department of Computer Applications | Desig: Assistant Professor
+ID: 14 | Name: Sanjay Pillai | Username: sanjay.pillai | Dept: Department of Computer Applications | Desig: Assistant Professor
+ID: 15 | Name: Neethu K | Username: neethu.k | Dept: Department of Computer Applications | Desig: Associate Professor
+ID: 16 | Name: Akash Ramesh | Username: akash.ramesh | Dept: Department of Computer Applications | Desig: Assistant Professor
+ID: 17 | Name: Greeshma Roy | Username: greeshma.roy | Dept: Department of Computer Applications | Desig: Professor
+ID: 18 | Name: Aravind P | Username: aravind.p | Dept: Department of Computer Applications | Desig: Assistant Professor
+ID: 19 | Name: Nimisha Das | Username: nimisha.das | Dept: Department of Computer Applications | Desig: Assistant Professor
+ID: 20 | Name: Jithin Paul | Username: jithin.paul | Dept: Department of Computer Applications | Desig: Associate Professor
+ID: 21 | Name: Sreelakshmi R | Username: sreelakshmi.r | Dept: Department of Computer Applications | Desig: Assistant Professor
+ID: 22 | Name: Adarsh Mohan | Username: adarsh.mohan | Dept: Department of Computer Applications | Desig: Assistant Professor
+ID: 23 | Name: Fathima Noor | Username: fathima.noor | Dept: Department of Computer Applications | Desig: Associate Professor
+ID: 24 | Name: Manu George | Username: manu.george | Dept: Department of Computer Applications | Desig: Assistant Professor
+ID: 25 | Name: Anu Kiran | Username: anu.kiran | Dept: Department of Computer Applications | Desig: Professor
+ID: 26 | Name: Sreerag S | Username: sreerag.s | Dept: Department of Business Administration | Desig: Assistant Professor
+ID: 27 | Name: Deepa Nair | Username: deepa.nair | Dept: Department of Business Administration | Desig: Assistant Professor
+ID: 28 | Name: Harikrishnan V | Username: harikrishnan.v | Dept: Department of Business Administration | Desig: Associate Professor
+ID: 29 | Name: Anjana Thomas | Username: anjana.thomas | Dept: Department of Business Administration | Desig: Assistant Professor
+ID: 30 | Name: Rohit Menon | Username: rohit.menon | Dept: Department of Business Administration | Desig: Assistant Professor
+ID: 31 | Name: Sangeetha R | Username: sangeetha.r | Dept: Department of Business Administration | Desig: Associate Professor
+ID: 32 | Name: Vimal Raj | Username: vimal.raj | Dept: Department of Business Administration | Desig: Assistant Professor
+ID: 33 | Name: Nisha Babu | Username: nisha.babu | Dept: Department of Business Administration | Desig: Professor
+ID: 34 | Name: Dr. Lakshmi Iyer | Username: .lakshmi.iyer | Dept: BASIC SCIENCES & HUMANITIES | Desig: Assistant Professor
+ID: 35 | Name: Dr. John Mathew | Username: .john.mathew | Dept: BASIC SCIENCES & HUMANITIES | Desig: Assistant Professor
+ID: 36 | Name: Priya Chandran | Username: priya.chandran | Dept: BASIC SCIENCES & HUMANITIES | Desig: Associate Professor
+ID: 37 | Name: Arjun Das | Username: arjun.das | Dept: BASIC SCIENCES & HUMANITIES | Desig: Assistant Professor
+ID: 38 | Name: Neena Kurian | Username: neena.kurian | Dept: BASIC SCIENCES & HUMANITIES | Desig: Assistant Professor
+ID: 39 | Name: Dr. Ravi Shankar | Username: .ravi.shankar | Dept: BASIC SCIENCES & HUMANITIES | Desig: Associate Professor
+ID: 40 | Name: Maya Krishnan | Username: maya.krishnan | Dept: BASIC SCIENCES & HUMANITIES | Desig: Assistant Professor
+ID: 41 | Name: Suresh Balan | Username: suresh.balan | Dept: BASIC SCIENCES & HUMANITIES | Desig: Professor
+ID: 42 | Name: Ajith Kumar | Username: ajith.kumar | Dept: Civil Engineering (CE) | Desig: Assistant Professor
+ID: 43 | Name: Lekshmi N | Username: lekshmi.n | Dept: Civil Engineering (CE) | Desig: Assistant Professor
+ID: 44 | Name: Vivek Anand | Username: vivek.anand | Dept: Civil Engineering (CE) | Desig: Associate Professor
+ID: 45 | Name: Gayathri S | Username: gayathri.s | Dept: Civil Engineering (CE) | Desig: Assistant Professor
+ID: 46 | Name: Shyam Narayan | Username: shyam.narayan | Dept: Civil Engineering (CE) | Desig: Assistant Professor
+ID: 47 | Name: Anupama R | Username: anupama.r | Dept: Civil Engineering (CE) | Desig: Associate Professor
+ID: 48 | Name: Karthik V | Username: karthik.v | Dept: Civil Engineering (CE) | Desig: Assistant Professor
+ID: 49 | Name: Rekha Pillai | Username: rekha.pillai | Dept: Civil Engineering (CE) | Desig: Professor
+ID: 50 | Name: Pradeep S | Username: pradeep.s | Dept: Mechanical Engineering (ME) | Desig: Assistant Professor
+ID: 51 | Name: Anish Varma | Username: anish.varma | Dept: Mechanical Engineering (ME) | Desig: Assistant Professor
+ID: 52 | Name: Sanjana K | Username: sanjana.k | Dept: Mechanical Engineering (ME) | Desig: Associate Professor
+ID: 53 | Name: Mahesh R | Username: mahesh.r | Dept: Mechanical Engineering (ME) | Desig: Assistant Professor
+ID: 54 | Name: Deepak Nair | Username: deepak.nair | Dept: Mechanical Engineering (ME) | Desig: Assistant Professor
+ID: 55 | Name: Aparna Mohan | Username: aparna.mohan | Dept: Mechanical Engineering (ME) | Desig: Associate Professor
+ID: 56 | Name: Rakesh Babu | Username: rakesh.babu | Dept: Mechanical Engineering (ME) | Desig: Assistant Professor
+ID: 57 | Name: Soumya Das | Username: soumya.das | Dept: Mechanical Engineering (ME) | Desig: Professor
+ID: 58 | Name: Rajeev Menon | Username: rajeev.menon | Dept: Electrical and Electronics Engineering (EEE) | Desig: Assistant Professor
+ID: 59 | Name: Athul Krishna | Username: athul.krishna | Dept: Electrical and Electronics Engineering (EEE) | Desig: Assistant Professor
+ID: 60 | Name: Keerthana S | Username: keerthana.s | Dept: Electrical and Electronics Engineering (EEE) | Desig: Associate Professor
+ID: 61 | Name: Manoj Pillai | Username: manoj.pillai | Dept: Electrical and Electronics Engineering (EEE) | Desig: Assistant Professor
+ID: 62 | Name: Swathi R | Username: swathi.r | Dept: Electrical and Electronics Engineering (EEE) | Desig: Assistant Professor
+ID: 63 | Name: Gokul Prasad | Username: gokul.prasad | Dept: Electrical and Electronics Engineering (EEE) | Desig: Associate Professor
+ID: 64 | Name: Anita Varghese | Username: anita.varghese | Dept: Electrical and Electronics Engineering (EEE) | Desig: Assistant Professor
+ID: 65 | Name: Naveen K | Username: naveen.k | Dept: Electrical and Electronics Engineering (EEE) | Desig: Professor
+ID: 66 | Name: Sandeep R | Username: sandeep.r | Dept: Electronics and Communication Engineering (ECE) | Desig: Assistant Professor
+ID: 67 | Name: Arya Mohan | Username: arya.mohan | Dept: Electronics and Communication Engineering (ECE) | Desig: Assistant Professor
+ID: 68 | Name: Jaison Thomas | Username: jaison.thomas | Dept: Electronics and Communication Engineering (ECE) | Desig: Associate Professor
+ID: 69 | Name: Megha S | Username: megha.s | Dept: Electronics and Communication Engineering (ECE) | Desig: Assistant Professor
+ID: 70 | Name: Rahul S Nair | Username: rahul.s.nair | Dept: Electronics and Communication Engineering (ECE) | Desig: Assistant Professor
+ID: 71 | Name: Anitha K | Username: anitha.k | Dept: Electronics and Communication Engineering (ECE) | Desig: Associate Professor
+ID: 72 | Name: Vineeth Kumar | Username: vineeth.kumar | Dept: Electronics and Communication Engineering (ECE) | Desig: Assistant Professor
+ID: 73 | Name: Sruthi Raj | Username: sruthi.raj | Dept: Electronics and Communication Engineering (ECE) | Desig: Professor
+ID: 74 | Name: Administrator | Username: admin | Dept: All | Desig: Admin
+
+--- Distinct Departments in Faculty table ---
+Name: CSE | Faculty Count: 1
+Name: Computer Science and Engineering (CSE) | Faculty Count: 8
+Name: Department of Computer Applications | Faculty Count: 16
+Name: Department of Business Administration | Faculty Count: 8
+Name: BASIC SCIENCES & HUMANITIES | Faculty Count: 8
+Name: Civil Engineering (CE) | Faculty Count: 8
+Name: Mechanical Engineering (ME) | Faculty Count: 8
+Name: Electrical and Electronics Engineering (EEE) | Faculty Count: 8
+Name: Electronics and Communication Engineering (ECE) | Faculty Count: 8
+Name: All | Faculty Count: 1

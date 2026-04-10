@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Complete Service Profile - MentrAi</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Outfit:wght@400;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+        rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#0EA5E9",
+                        "background-light": "#F8FAFC",
+                        "background-dark": "#0F172A",
+                        "card-dark": "#1E293B",
+                        "input-dark": "#334155",
+                    },
+                    fontFamily: {
+                        sans: ["Inter", "sans-serif"],
+                        display: ["Outfit", "sans-serif"],
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        .tech-bg {
+            background-color: #0F172A;
+            background-image:
+                radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.1) 0px, transparent 50%);
+        }
+
+        .form-section {
+            transition: all 0.3s ease;
+        }
+
+        .form-section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-slate-50 dark:bg-background-dark min-h-screen font-sans tech-bg text-slate-900 dark:text-slate-100 pb-20">
+
+    <!-- Navbar for this standalone page -->
+    <nav
+        class="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                        <span class="material-symbols-outlined text-white text-xl">school</span>
+                    </div>
+                    <span class="text-xl font-display font-bold tracking-tight">MentrAi</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a href="{{ url_for('logout') }}"
+                        class="text-sm font-medium text-slate-500 hover:text-primary transition-colors flex items-center gap-1">
+                        <span class="material-symbols-outlined text-lg">logout</span> Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+        <div class="mb-10 text-center">
+            <h1 class="text-3xl md:text-4xl font-display font-bold text-slate-900 dark:text-white mb-4">Complete Your
+                Profile</h1>
+            <p class="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
+                Please provide your detailed academic and personal information to unlock the full potential of your AI
+                mentoring dashboard.
+            </p>
+        </div>
+
+        <form method="POST" action="{{ url_for('complete_profile') }}" enctype="multipart/form-data" class="space-y-8">
+
+            <!-- 1. Personal Details -->
+            <div
+                class="bg-white dark:bg-card-dark rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700/50 form-section">
+                <div
+                    class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20 flex items-center gap-3">
+                    <span
+                        class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">1</span>
+                    <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200">Personal Details</h2>
+                </div>
+                <div class="p-6 md:p-8">
+                    <!-- Photo Upload with Preview -->
+                    <div class="flex flex-col items-center mb-8">
+                        <div class="relative group cursor-pointer">
+                            <div
+                                class="w-32 h-32 rounded-full overflow-hidden ring-4 ring-slate-100 dark:ring-slate-700 shadow-lg bg-slate-200 dark:bg-slate-800 relative">
+                                {% if student.photo_path %}
+                                <img src="{{ url_for('static', filename=student.photo_path) }}" id="photoPrv"
+                                    class="w-full h-full object-cover">
+                                {% else %}
+                                <div class="w-full h-full flex items-center justify-center text-slate-400">
+                                    <span class="material-symbols-outlined text-4xl">person</span>
+                                </div>
+                                <img id="photoPrv" class="w-full h-full object-cover absolute inset-0 hidden">
+                                {% endif %}
+                            </div>
+                            <label for="photoInput"
+                                class="absolute bottom-0 right-0 bg-primary hover:bg-sky-600 text-white p-2 rounded-full shadow-lg cursor-pointer transition-transform transform group-hover:scale-110">
+                                <span class="material-symbols-outlined text-sm">edit</span>
+                            </label>
+                            <input type="file" id="photoInput" name="photo" accept="image/*" class="hidden"
+                                onchange="previewImage(this)">
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">Upload Profile Photo</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="space-y-2">
+                            <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Roll
+                                Number</label>
+                            <input type="text" name="roll_number"
+                                value="{{ student.roll_number if student.roll_number else '' }}"
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent focus:border-primary focus:ring-0 rounded-lg"
+                                placeholder="e.g. 21CS001">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Branch</label>
+                            <input type="text" name="branch" value="{{ student.branch if student.branch else '' }}"
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent focus:border-primary focus:ring-0 rounded-lg"
+                                placeholder="e.g. CSE">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Batch</label>
+                            <input type="text" name="batch" value="{{ student.batch if student.batch else '' }}"
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent focus:border-primary focus:ring-0 rounded-lg"
+                                placeholder="e.g. 2023-2027">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Date of
+                                Birth</label>
+                            <input type="date" name="dob"
+                                value="{{ student.dob.strftime('%Y-%m-%d') if student.dob else '' }}"
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent focus:border-primary focus:ring-0 rounded-lg">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Age</label>
+                            <input type="number" name="age" value="{{ student.age if student.age else '' }}"
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent focus:border-primary focus:ring-0 rounded-lg"
+                                placeholder="Age">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Blood
+                                Group</label>
+                            <select name="blood_group"
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent focus:border-primary focus:ring-0 rounded-lg">
+                                <option value="" {% if not student.blood_group %}selected{% endif %}>Select</option>
+                                <option value="A+" {% if student.blood_group=='A+' %}selected{% endif %}>A+</option>
+                                <option value="O+" {% if student.blood_group=='O+' %}selected{% endif %}>O+</option>
+                                <option value="B+" {% if student.blood_group=='B+' %}selected{% endif %}>B+</option>
+                                <option value="AB+" {% if student.blood_group=='AB+' %}selected{% endif %}>AB+</option>
+                                <option value="A-" {% if student.blood_group=='A-' %}selected{% endif %}>A-</option>
+                                <option value="O-" {% if student.blood_group=='O-' %}selected{% endif %}>O-</option>
+                                <option value="B-" {% if student.blood_group=='B-' %}selected{% endif %}>B-</option>
+                                <option value="AB-" {% if student.blood_group=='AB-' %}selected{% endif %}>AB-</option>
+                            </select>
+                        </div>
+                        <div class="space-y-2">
+                            <label
+                                class="text-xs font-semibold uppercase tracking-wider text-slate-500">Religion</label>
+                            <input type="text" name="religion"
+                                value="{{ student.religion if student.religion else '' }}"
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent focus:border-primary focus:ring-0 rounded-lg">
+                        </div>
+                        <div class="space-y-2">
+                            <label
+                                class="text-xs font-semibold uppercase tracking-wider text-slate-500">Category</label>
+                            <select name="caste_category"
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent focus:border-primary focus:ring-0 rounded-lg">
+                                <option value="" {% if not student.caste_category %}selected{% endif %}>Select</option>
+                                <option value="General" {% if student.caste_category=='General' %}selected{% endif %}>
+                                    General</option>
+                                <option value="OBC" {% if student.caste_category=='OBC' %}selected{% endif %}>OBC
+                                </option>
+                                <option value="SC" {% if student.caste_category=='SC' %}selected{% endif %}>SC</option>
+                                <option value="ST" {% if student.caste_category=='ST' %}selected{% endif %}>ST</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Parent Details -->
+            <div
+                class="bg-white dark:bg-card-dark rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700/50 form-section">
+                <div
+                    class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20 flex items-center gap-3">
+                    <span
+                        class="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">2</span>
+                    <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200">Parent Details</h2>
+                </div>
+                <div class="p-6 md:p-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- Father -->
+                        <div class="space-y-4 p-4 border border-slate-100 dark:border-slate-700 rounded-xl">
+                            <h3 class="font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                <span class="material-symbols-outlined text-slate-400">face</span> Father
+                            </h3>
+                            <div class="space-y-3">
+                                <input type="text" name="father_name"
+                                    value="{{ student.parents.father_name if student.parents else '' }}"
+                                    placeholder="Name *" required
+                                    class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg text-sm">
+                                <input type="text" name="father_profession"
+                                    value="{{ student.parents.father_profession if student.parents else '' }}"
+                                    placeholder="Profession *" required
+                                    class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg text-sm">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <input type="number" name="father_age"
+                                        value="{{ student.parents.father_age if student.parents else '' }}"
+                                        placeholder="Age *" required
+                                        class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg text-sm">
+                                    <input type="text" name="father_mobile"
+                                        value="{{ student.parents.father_mobile if student.parents else '' }}"
+                                        placeholder="Mobile *" required
+                                        class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg text-sm">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Mother -->
+                        <div class="space-y-4 p-4 border border-slate-100 dark:border-slate-700 rounded-xl">
+                            <h3 class="font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                <span class="material-symbols-outlined text-slate-400">face_3</span> Mother
+                            </h3>
+                            <div class="space-y-3">
+                                <input type="text" name="mother_name"
+                                    value="{{ student.parents.mother_name if student.parents else '' }}"
+                                    placeholder="Name *" required
+                                    class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg text-sm">
+                                <input type="text" name="mother_profession"
+                                    value="{{ student.parents.mother_profession if student.parents else '' }}"
+                                    placeholder="Profession *" required
+                                    class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg text-sm">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <input type="number" name="mother_age"
+                                        value="{{ student.parents.mother_age if student.parents else '' }}"
+                                        placeholder="Age *" required
+                                        class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg text-sm">
+                                    <input type="text" name="mother_mobile"
+                                        value="{{ student.parents.mother_mobile if student.parents else '' }}"
+                                        placeholder="Mobile *" required
+                                        class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg text-sm">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Academic Details -->
+            <div
+                class="bg-white dark:bg-card-dark rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700/50 form-section">
+                <div
+                    class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20 flex items-center gap-3">
+                    <span
+                        class="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center font-bold">3</span>
+                    <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200">Academic History</h2>
+                </div>
+                <div class="p-6 md:p-8 space-y-8">
+                    <!-- 10th -->
+                    <div>
+                        <h3
+                            class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-100 dark:border-slate-700 pb-2">
+                            10th Standard</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <input type="text" name="school_10th"
+                                value="{{ student.academics.school_10th if student.academics else '' }}"
+                                placeholder="School Name *" required
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg">
+                            <input type="text" name="board_10th"
+                                value="{{ student.academics.board_10th if student.academics else '' }}"
+                                placeholder="Board (e.g. CBSE) *" required
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg">
+                            <input type="number" step="0.01" name="percentage_10th"
+                                value="{{ student.academics.percentage_10th if student.academics else '' }}"
+                                placeholder="Percentage (%) *" required
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg">
+                        </div>
+                    </div>
+                    <!-- 12th -->
+                    <div>
+                        <h3
+                            class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-100 dark:border-slate-700 pb-2">
+                            12th / Diploma</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <input type="text" name="school_12th"
+                                value="{{ student.academics.school_12th if student.academics else '' }}"
+                                placeholder="School/College Name *" required
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg">
+                            <input type="text" name="board_12th"
+                                value="{{ student.academics.board_12th if student.academics else '' }}"
+                                placeholder="Board *" required
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg">
+                            <input type="number" step="0.01" name="percentage_12th"
+                                value="{{ student.academics.percentage_12th if student.academics else '' }}"
+                                placeholder="Percentage (%) *" required
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg">
+                        </div>
+                    </div>
+                    <!-- UG -->
+                    <div>
+                        <h3
+                            class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-100 dark:border-slate-700 pb-2">
+                            Undergraduate (Current)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <input type="text" name="college_ug"
+                                value="{{ student.academics.college_ug if student.academics else '' }}"
+                                placeholder="College Name"
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg">
+                            <input type="text" name="university_ug"
+                                value="{{ student.academics.university_ug if student.academics else '' }}"
+                                placeholder="University"
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <input type="number" step="0.01" name="percentage_ug"
+                                value="{{ student.academics.percentage_ug if student.academics else '' }}"
+                                placeholder="Overall %"
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg">
+                            <input type="number" step="0.01" name="sgpa"
+                                value="{{ student.academics.sgpa if student.academics else '' }}"
+                                placeholder="Current SGPA"
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg">
+                            <input type="number" step="0.01" name="cgpa"
+                                value="{{ student.academics.cgpa if student.academics else '' }}"
+                                placeholder="Current CGPA"
+                                class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Other Details -->
+            <div
+                class="bg-white dark:bg-card-dark rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700/50 form-section">
+                <div
+                    class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20 flex items-center gap-3">
+                    <span
+                        class="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold">4</span>
+                    <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200">Additional Information</h2>
+                </div>
+                <div class="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Accommodation
+                            *</label>
+                        <select name="accommodation_type" required
+                            class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg h-12">
+                            <option value="">Select Option</option>
+                            <option value="Day Scholar" {% if student.other_info and
+                                student.other_info.accommodation_type=='Day Scholar' %}selected{% endif %}>Day Scholar
+                            </option>
+                            <option value="Hosteller" {% if student.other_info and
+                                student.other_info.accommodation_type=='Hosteller' %}selected{% endif %}>Hosteller
+                            </option>
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Mode of
+                            Transport</label>
+                        <input type="text" name="transport_mode"
+                            value="{{ student.other_info.transport_mode if student.other_info else '' }}"
+                            placeholder="e.g. Bus, Bike"
+                            class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg h-12 container-query">
+                    </div>
+                    <div class="md:col-span-2 space-y-2">
+                        <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Siblings
+                            Details</label>
+                        <textarea name="siblings_details" rows="3"
+                            class="w-full bg-slate-50 dark:bg-input-dark border-transparent rounded-lg p-3"
+                            placeholder="Name, Age, Occupation...">{{ student.other_info.siblings_details if student.other_info else '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div
+                class="fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex justify-end gap-4 z-40">
+                <button type="submit"
+                    class="bg-primary hover:bg-sky-600 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-sky-500/20 transition-all transform hover:-translate-y-1">
+                    Save Complete Profile
+                </button>
+            </div>
+
+            <!-- Spacer for fixed bottom bar -->
+            <div class="h-16"></div>
+
+        </form>
+    </div>
+
+    <script>
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    var img = document.getElementById('photoPrv');
+                    img.src = e.target.result;
+                    img.classList.remove('hidden');
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
+</body>
+
+</html>

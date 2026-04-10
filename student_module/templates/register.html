@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>MentrAi - Student Registration</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Outfit:wght@400;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+        rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#0ea5e9", // Sky Blue
+                        "background-light": "#f8fafc",
+                        "background-dark": "#000000",
+                        "card-dark": "#0a0a0a",
+                    },
+                    fontFamily: {
+                        sans: ["Inter", "sans-serif"],
+                        display: ["Outfit", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "12px",
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        .glass-panel {
+            background: rgba(10, 10, 10, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tech-gradient {
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.9) 0%, rgba(3, 105, 161, 0.9) 100%);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark font-sans text-slate-900 dark:text-slate-100 min-h-screen flex items-center justify-center p-4">
+    <div
+        class="w-full max-w-6xl flex flex-col md:flex-row bg-white dark:bg-card-dark rounded-[24px] overflow-hidden shadow-2xl ring-1 ring-slate-200 dark:ring-white/10 min-h-[800px]">
+        <div class="w-full md:w-1/2 p-8 md:p-12 lg:p-16 flex flex-col justify-center">
+            <div class="mb-10 text-center md:text-left">
+                <div class="flex items-center justify-center md:justify-start gap-2 mb-6">
+                    <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+                        <span class="material-symbols-outlined text-white text-2xl">school</span>
+                    </div>
+                    <span class="text-2xl font-display font-bold tracking-tight">MentrAi</span>
+                </div>
+                <h1 class="text-3xl font-display font-bold mb-2">Create Account</h1>
+                <p class="text-slate-500 dark:text-slate-400">Join the next generation of student learning.</p>
+            </div>
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div
+                class="mb-6 p-4 rounded-xl text-sm font-medium {% if category == 'error' %}bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400{% else %}bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('register') }}" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="relative group">
+                        <span
+                            class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors text-xl">person</span>
+                        <input name="full_name"
+                            class="w-full pl-12 pr-4 py-3.5 bg-slate-100 dark:bg-white/5 border-transparent focus:border-primary focus:ring-0 rounded-xl transition-all outline-none"
+                            placeholder="Full Name" required="" type="text" />
+                    </div>
+                    <div class="relative group">
+                        <span
+                            class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors text-xl">badge</span>
+                        <input name="admission_number" id="admission_number"
+                            class="w-full pl-12 pr-4 py-3.5 bg-slate-100 dark:bg-white/5 border-transparent focus:border-primary focus:ring-0 rounded-xl transition-all outline-none"
+                            placeholder="Admission No." required="" type="text" oninput="detectDepartment()" />
+                    </div>
+                </div>
+                <!-- Department Field (Auto-detected) -->
+                <div class="relative group">
+                    <span
+                        class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors text-xl">account_balance</span>
+                    <input name="department" id="department"
+                        class="w-full pl-12 pr-4 py-3.5 bg-slate-100/50 dark:bg-white/5 border-transparent focus:border-primary focus:ring-0 rounded-xl transition-all outline-none cursor-not-allowed opacity-80"
+                        readonly="" type="text" placeholder="Department (Auto-detected)" />
+                    <span
+                        class="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Auto-detected</span>
+                </div>
+                <div class="relative group">
+                    <span
+                        class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors text-xl">mail</span>
+                    <input name="email"
+                        class="w-full pl-12 pr-4 py-3.5 bg-slate-100 dark:bg-white/5 border-transparent focus:border-primary focus:ring-0 rounded-xl transition-all outline-none"
+                        pattern=".+@gmail\.com" placeholder="Email Address (@gmail.com only)" required=""
+                        type="email" />
+                </div>
+                <div class="relative group">
+                    <span
+                        class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors text-xl">lock</span>
+                    <input name="password" id="password"
+                        class="w-full pl-12 pr-4 py-3.5 bg-slate-100 dark:bg-white/5 border-transparent focus:border-primary focus:ring-0 rounded-xl transition-all outline-none"
+                        placeholder="Create Password" required="" type="password" />
+                </div>
+                <div class="relative group">
+                    <span
+                        class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors text-xl">lock_reset</span>
+                    <input name="confirm_password" id="confirm_password"
+                        class="w-full pl-12 pr-4 py-3.5 bg-slate-100 dark:bg-white/5 border-transparent focus:border-primary focus:ring-0 rounded-xl transition-all outline-none"
+                        placeholder="Confirm Password" required="" type="password" />
+                </div>
+                <div class="pt-4">
+                    <button
+                        class="w-full py-4 bg-primary hover:bg-sky-600 text-white font-bold rounded-xl shadow-lg shadow-sky-500/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+                        type="submit">
+                        SIGN UP NOW
+                    </button>
+                </div>
+            </form>
+            <div class="mt-8 text-center">
+                <p class="text-slate-500 dark:text-slate-400 text-sm">
+                    Already have an account?
+                    <a class="text-primary font-semibold hover:underline" href="{{ url_for('login') }}">Sign in here</a>
+                </p>
+            </div>
+
+            <!-- Social Login Removed as per request -->
+
+        </div>
+        <div class="hidden md:flex w-1/2 relative overflow-hidden bg-slate-900">
+            <img alt="Abstract technology background" class="absolute inset-0 w-full h-full object-cover opacity-60"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBC17_U264dy7Q5Wx26gFrL5b3ptEKNE5qIAkH3mfVKOLLh4dzElrm4a2Qjg0Oq6zlPTKr0jXcy1gg5lL5N6KaGbFVf4X8yTGLIAH3Nd6CndIXJCdK25MKIqb1Vi98cx2OK6Rfvj2uPKXoXzXLRqcHvJL1lq4Q-bg1zbDVBcyHYJ6QGCwtMp654NQws79LbK85nnI0EWQoxumImr69bn2Ed5tH7nC5gu-zQ27RmTLz50ZxJu0If_mGtHDTVOUZ7TsiSKN9r08mVjuI" />
+            <div class="absolute inset-0 tech-gradient mix-blend-multiply"></div>
+            <div
+                class="relative z-10 w-full h-full flex flex-col items-center justify-center text-white p-12 text-center">
+                <div class="mb-8">
+                    <span
+                        class="material-symbols-outlined text-7xl md:text-9xl opacity-20 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 select-none">school</span>
+                    <div class="relative flex flex-col items-center">
+                        <span class="material-symbols-outlined text-6xl mb-4">school</span>
+                        <h2 class="text-5xl font-display font-bold tracking-tighter mb-4">MentrAi</h2>
+                    </div>
+                </div>
+                <div class="max-w-md">
+                    <h3 class="text-xl font-medium mb-4">Personalized Learning Ecosystem</h3>
+                    <p class="text-sky-100/70 leading-relaxed">
+                        Access your courses, track academic progress, and connect with peers through our intelligent
+                        student portal. Empowering your educational journey with AI.
+                    </p>
+                </div>
+                <div
+                    class="absolute bottom-12 left-0 right-0 flex justify-center gap-12 text-sm font-medium tracking-widest text-white/60">
+                    <div class="flex flex-col">
+                        <span class="text-white text-lg">15k+</span>
+                        <span>STUDENTS</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-white text-lg">200+</span>
+                        <span>COURSES</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-white text-lg">98%</span>
+                        <span>SUCCESS</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript for Department Auto-Detection -->
+    <script>
+        function detectDepartment() {
+            const admissionInput = document.getElementById('admission_number');
+            const departmentInput = document.getElementById('department');
+            const val = admissionInput.value.trim().toUpperCase();
+
+            let branch = "";
+
+            // User-specified Mappings
+            if (val.includes('CY')) {
+                branch = "Cyber Security (B.Tech)";
+            } else if (val.includes('ECS')) {
+                branch = "Electronics and Computer Science";
+            } else if (val.includes('EEE')) {
+                branch = "Electronics and Electrical Engineering";
+            } else if (val.includes('AD')) {
+                branch = "Artificial Intelligence and Data Science";
+            } else if (val.includes('AI')) {
+                branch = "Artificial Intelligence (B.Tech)"; // Order matters if partial matches exist
+            } else if (val.includes('IMCA') || val.includes('MCA')) {
+                branch = "Computer Applications";
+            } else if (val.includes('MBA')) {
+                branch = "Master of Business Administration";
+            } else if (val.includes('CIVL') || val.includes('CE')) {
+                branch = "Civil Engineering";
+            } else if (val.includes('MECHANICAL') || val.includes('ME')) {
+                branch = "Mechanical Engineering";
+            }
+            // Fallback for standard codes if they don't overlap with specific requests
+            else if (val.includes('CSE') || val.includes('CS')) {
+                branch = "Computer Science Engineering";
+            } else if (val.includes('ECE') || val.includes('EC')) {
+                branch = "Electronics & Communication";
+            }
+
+            if (val === "") {
+                departmentInput.value = "";
+            } else {
+                departmentInput.value = branch;
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,17 @@
+Administrator - admin - All
+Test Mentor - mentor1 - Computer Science
+Test Mentor - test_mentor - Computer Science
+Dr. John Smith - ca_hod - Computer Applications
+Dr. Jane Doe - cse_asp - Computer Science & Engineering
+Dr. Robert Johnson - me_prof1 - Mechanical Engineering
+Dr. Emily Davis - ce_prof1 - Civil Engineering
+Dr. Rajesh Menon - me_pro - MECHANICAL ENGINEERING
+Dr. Anjali Varma - me_apro - MECHANICAL ENGINEERING
+Dr. Suresh Pillai - ce_pro - CIVIL ENGINEERING
+Dr. Divya Krishnan - ce_apro - CIVIL ENGINEERING
+Dr. Nikhil Thomas - ee_pro - ELECTRICAL ENGINEERING
+Dr. Lekshmi R - ee_apro - ELECTRICAL ENGINEERING
+Dr. Harish Babu - ec_pro - ELECTRONICS & COMMUNICATION
+Dr. Sneha Mathew - ec_apro - ELECTRONICS & COMMUNICATION
+Dr. Vivek Joseph - ca_pro - Department of Computer Applications
+Dr. Neethu George - ca_apro - Department of Computer Applications

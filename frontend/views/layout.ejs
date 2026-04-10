@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= title || 'MentorAI - Student Module' %>
+    </title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1 class="logo">MENTOR-AI</h1>
+            <p class="tagline">AI-Powered Academic Mentoring & Support</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Navigation -->
+        <% if (typeof user !=='undefined' && user) { %>
+            <nav class="nav-links">
+                <a href="/dashboard" class="nav-link">Dashboard</a>
+                <a href="/profile" class="nav-link">Profile</a>
+                <a href="/logout" class="nav-link">Logout</a>
+            </nav>
+            <% } else { %>
+                <nav class="nav-links">
+                    <a href="/login" class="nav-link">Login</a>
+                    <a href="/register" class="nav-link">Register</a>
+                </nav>
+                <% } %>
+
+                    <!-- Flash Messages -->
+                    <% if (typeof error !=='undefined' && error) { %>
+                        <div class="alert alert-error">
+                            <%= error %>
+                        </div>
+                        <% } %>
+                            <% if (typeof success !=='undefined' && success) { %>
+                                <div class="alert alert-success">
+                                    <%= success %>
+                                </div>
+                                <% } %>
+
+                                    <!-- Main Content -->
+                                    <main class="main-content">
+                                        <%- body %>
+                                    </main>
+
+                                    <!-- Footer -->
+                                    <footer class="footer">
+                                        &copy; 2026 MENTOR-AI. Empowering academic excellence through intelligent
+                                        mentoring.
+                                    </footer>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,10 @@
+--- PHASE 5 SIMULATION TEST ---
+[Case A] Det: 85.0 | ML: 75.0 | Comp: 90% -> Mod: -0.05
+Original Combo: 80.0 | Adjusted Combo: 75.0 | Shift: -5.0
+--------------------------------------------------
+[Case B] Det: 45.0 | ML: 20.0 | Comp: 20% -> Mod: 0.1
+Original Combo: 32.5 | Adjusted Combo: 42.5 | Shift: +10.0
+--------------------------------------------------
+[Case C] Det: 5.0 | ML: 0.0 | Comp: 95% -> Mod: -0.05
+Original Combo: 2.5 | Adjusted Combo: 0.0 | Shift: -2.5
+--------------------------------------------------

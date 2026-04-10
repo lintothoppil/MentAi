@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Login - MentorAI</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <header class="header">
+        <div class="container">
+            <h1 class="logo">MENTOR-AI</h1>
+            <p class="tagline">AI-Powered Academic Mentoring & Support</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="card" style="max-width: 500px; margin: 2rem auto;">
+            <h2 class="page-title">Student Login</h2>
+
+            <% if (error) { %>
+                <div class="alert alert-error">
+                    <%= error %>
+                </div>
+                <% } %>
+
+                    <form method="POST" action="/login">
+                        <div class="form-section">
+                            <div class="section-header">LOGIN CREDENTIALS</div>
+                            <div class="table-wrapper">
+                                <table>
+                                    <tr>
+                                        <th>Admission Number</th>
+                                        <td><input type="text" name="admission_number" required
+                                                placeholder="Enter your admission number"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Password</th>
+                                        <td><input type="password" name="password" required
+                                                placeholder="Enter your password"></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-4">
+                            <input type="submit" value="Login" class="btn btn-primary btn-block">
+                        </div>
+                    </form>
+
+                    <div class="text-center mt-4">
+                        <p>
+                            <a href="/forgot-password" class="nav-link"
+                                style="display: inline-block; padding: 0.25rem 0.75rem;">Forgot Password?</a> |
+                            <a href="/register" class="nav-link"
+                                style="display: inline-block; padding: 0.25rem 0.75rem;">New student? Register here</a>
+                        </p>
+                    </div>
+        </div>
+
+        <footer class="footer">
+            &copy; 2026 MENTOR-AI. Empowering academic excellence through intelligent mentoring.
+        </footer>
+    </div>
+</body>
+
+</html>

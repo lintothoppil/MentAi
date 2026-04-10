@@ -1,0 +1,7 @@
+Computer Science and Engineering (CSE) -> {'2022-2026', '2020-2024', '2024-2028'}
+Electronics and Communication Engineering (ECE) -> {None}
+Civil Engineering (CE) -> {'2023-2027'}
+Department of Business Administration -> {'2024-2028', '2023-2027'}
+Department of Computer Applications -> {'MCA 2024-2026', 'MCA 2025-2027', 'MCA 2023-2025', 'IMCA 2024-2029'}
+Electrical and Electronics Engineering (EEE) -> {None}
+Mechanical Engineering (ME) -> {None}

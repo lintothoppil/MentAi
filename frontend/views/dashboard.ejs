@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - MentorAI</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <header class="header">
+        <div class="container">
+            <h1 class="logo">MENTOR-AI</h1>
+            <p class="tagline">AI-Powered Academic Mentoring & Support</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <nav class="nav-links">
+            <a href="/dashboard" class="nav-link active">Dashboard</a>
+            <a href="/profile" class="nav-link">Edit Profile</a>
+            <a href="/logout" class="nav-link">Logout</a>
+        </nav>
+
+        <div class="card">
+            <h2 class="page-title">Student Dashboard</h2>
+            <p class="page-subtitle">Welcome, <%= user.name %>!</p>
+
+            <div class="form-section">
+                <div class="section-header">STUDENT INFORMATION</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>Admission Number</th>
+                            <td>
+                                <%= profile.admission_number %>
+                            </td>
+                            <th>Full Name</th>
+                            <td>
+                                <%= profile.full_name %>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Department</th>
+                            <td>
+                                <%= profile.department || 'Not Set' %>
+                            </td>
+                            <th>Email</th>
+                            <td>
+                                <%= profile.email %>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Mobile Number</th>
+                            <td>
+                                <%= profile.mobile || 'Not Provided' %>
+                            </td>
+                            <th>Address</th>
+                            <td>
+                                <%= profile.address || 'Not Provided' %>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <% if (profile.parents) { %>
+                <div class="form-section mt-4">
+                    <div class="section-header">PARENT DETAILS</div>
+                    <div class="table-wrapper">
+                        <table>
+                            <tr>
+                                <th>Father's Name</th>
+                                <td>
+                                    <%= profile.parents.father_name || 'Not Provided' %>
+                                </td>
+                                <th>Mother's Name</th>
+                                <td>
+                                    <%= profile.parents.mother_name || 'Not Provided' %>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                <% } %>
+
+                    <% if (profile.academics) { %>
+                        <div class="form-section mt-4">
+                            <div class="section-header">ACADEMIC DETAILS</div>
+                            <div class="table-wrapper">
+                                <table>
+                                    <tr>
+                                        <th>10th School</th>
+                                        <td>
+                                            <%= profile.academics.school_10th || 'Not Provided' %>
+                                        </td>
+                                        <th>10th Percentage</th>
+                                        <td>
+                                            <%= profile.academics.percentage_10th || 'Not Provided' %>%
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        <% } %>
+
+                            <% if (!profile.profile_completed) { %>
+                                <div class="alert alert-info mt-4">
+                                    <strong>Complete Your Profile:</strong> Please update your profile with parent
+                                    details, academic information, and other details.
+                                    <a href="/profile" class="btn btn-primary" style="margin-left: 1rem;">Complete
+                                        Profile</a>
+                                </div>
+                                <% } %>
+        </div>
+
+        <footer class="footer">
+            &copy; 2026 MENTOR-AI. Empowering academic excellence through intelligent mentoring.
+        </footer>
+    </div>
+</body>
+
+</html>

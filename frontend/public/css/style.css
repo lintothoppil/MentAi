@@ -1,0 +1,321 @@
+/* ============================================
+   MentorAI Student Module - Simple Table Style
+   ============================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', 'Helvetica', sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* ============ Header ============ */
+.header {
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    color: white;
+    padding: 1.5rem 0;
+    text-align: center;
+    border-bottom: 3px solid #1e3c72;
+}
+
+.logo {
+    font-size: 2rem;
+    font-weight: bold;
+    letter-spacing: 2px;
+    margin-bottom: 0.5rem;
+}
+
+.tagline {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+/* ============ Navigation ============ */
+.nav-links {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin: 1.5rem 0;
+    flex-wrap: wrap;
+}
+
+.nav-link {
+    background-color: #2a5298;
+    color: white;
+    padding: 0.5rem 1.5rem;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+    border: 1px solid #1e3c72;
+}
+
+.nav-link:hover,
+.nav-link.active {
+    background-color: #1e3c72;
+}
+
+/* ============ Card ============ */
+.card {
+    background: white;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 2rem;
+    margin: 1.5rem 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ============ Page Title ============ */
+.page-title {
+    font-size: 1.8rem;
+    color: #1e3c72;
+    margin-bottom: 0.5rem;
+    text-align: center;
+    border-bottom: 2px solid #2a5298;
+    padding-bottom: 0.5rem;
+}
+
+.page-subtitle {
+    text-align: center;
+    color: #666;
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+}
+
+/* ============ Form Sections ============ */
+.form-section {
+    margin: 1.5rem 0;
+}
+
+.section-header {
+    background-color: #1e3c72;
+    color: white;
+    padding: 0.75rem 1rem;
+    font-weight: bold;
+    font-size: 0.95rem;
+    border: 1px solid #1e3c72;
+    margin-bottom: 0;
+}
+
+/* ============ Tables ============ */
+.table-wrapper {
+    border: 1px solid #ddd;
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+table th {
+    background-color: #f8f9fa;
+    color: #333;
+    font-weight: 600;
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border: 1px solid #ddd;
+    width: 25%;
+    font-size: 0.9rem;
+}
+
+table td {
+    padding: 0.75rem 1rem;
+    border: 1px solid #ddd;
+    font-size: 0.9rem;
+}
+
+table input[type="text"],
+table input[type="email"],
+table input[type="password"],
+table input[type="number"],
+table input[type="date"],
+table select,
+table textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+
+table input:focus,
+table select:focus,
+table textarea:focus {
+    outline: none;
+    border-color: #2a5298;
+    box-shadow: 0 0 0 2px rgba(42, 82, 152, 0.1);
+}
+
+table textarea {
+    min-height: 60px;
+    resize: vertical;
+}
+
+/* ============ Buttons ============ */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.3s;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-primary {
+    background-color: #2a5298;
+    color: white;
+    border: 1px solid #1e3c72;
+}
+
+.btn-primary:hover {
+    background-color: #1e3c72;
+}
+
+.btn-block {
+    width: 100%;
+    max-width: 400px;
+}
+
+input[type="submit"] {
+    cursor: pointer;
+}
+
+/* ============ Alerts ============ */
+.alert {
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 4px;
+    border: 1px solid transparent;
+}
+
+.alert-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.alert-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border-color: #bee5eb;
+}
+
+/* ============ Utilities ============ */
+.text-center {
+    text-align: center;
+}
+
+.mt-4 {
+    margin-top: 1.5rem;
+}
+
+.mb-4 {
+    margin-bottom: 1.5rem;
+}
+
+/* ============ Footer ============ */
+.footer {
+    text-align: center;
+    padding: 1.5rem 0;
+    color: #666;
+    font-size: 0.85rem;
+    margin-top: 2rem;
+    border-top: 1px solid #ddd;
+}
+
+/* ============ Responsive ============ */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+
+    .card {
+        padding: 1rem;
+    }
+
+    table th,
+    table td {
+        padding: 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .nav-links {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .logo {
+        font-size: 1.5rem;
+    }
+}
+
+/* ============ Animations ============ */
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============ Profile Photo ============ */
+.profile-photo {
+    width: 150px;
+    height: 150px;
+    object-fit: cover;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+}
+
+/* ============ Progress Bar ============ */
+.progress-container {
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    height: 30px;
+    margin: 1rem 0;
+    position: relative;
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, #2a5298, #1e3c72);
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 0.85rem;
+}

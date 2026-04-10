@@ -1,0 +1,63 @@
+Total dataset size: 240
+
+--- 5-Fold Cross Validation ---
+CV Scores: [1. 1. 1. 1. 1.]
+Mean CV Accuracy: 1.0000
+
+--- Model vs Deterministic Mismatch Analysis ---
+
+Total Students Evaluated: 240
+Total Mismatches (Deterministic 'Declining' vs ML > 70%): 0
+Total Significant Deltas (Difference > 20%): 70
+
+--- 10 Sample Edge Cases (High Delta) ---
+Student: A24000
+  Deterministic Status: Improving
+  Det Risk: 44.00 | ML Prob: 0.00 | Delta: -44.00
+  Att Slp: 0.023 | Mk Slp: 19.3
+  Att pct: 74.3 | Avg Mk: 58.8 | Fails: 1
+Student: A24008
+  Deterministic Status: Stable
+  Det Risk: 40.00 | ML Prob: 1.03 | Delta: -38.97
+  Att Slp: -0.011 | Mk Slp: -0.8
+  Att pct: 74.3 | Avg Mk: 64.5 | Fails: 0
+Student: A24009
+  Deterministic Status: Stable
+  Det Risk: 44.00 | ML Prob: 0.00 | Delta: -44.00
+  Att Slp: 0.010 | Mk Slp: 14.7
+  Att pct: 74.3 | Avg Mk: 56.4 | Fails: 1
+Student: A24012
+  Deterministic Status: Stable
+  Det Risk: 40.00 | ML Prob: 0.00 | Delta: -40.00
+  Att Slp: 0.016 | Mk Slp: 16.4
+  Att pct: 65.7 | Avg Mk: 55.5 | Fails: 0
+Student: A24018
+  Deterministic Status: Stable
+  Det Risk: 40.00 | ML Prob: 4.09 | Delta: -35.91
+  Att Slp: 0.018 | Mk Slp: 19.5
+  Att pct: 60.0 | Avg Mk: 62.0 | Fails: 0
+Student: A24020
+  Deterministic Status: Stable
+  Det Risk: 40.00 | ML Prob: 0.07 | Delta: -39.93
+  Att Slp: 0.016 | Mk Slp: -0.0
+  Att pct: 74.3 | Avg Mk: 62.6 | Fails: 0
+Student: A24022
+  Deterministic Status: Stable
+  Det Risk: 40.00 | ML Prob: 10.27 | Delta: -29.73
+  Att Slp: -0.015 | Mk Slp: -23.7
+  Att pct: 80.0 | Avg Mk: 57.4 | Fails: 0
+Student: A24024
+  Deterministic Status: Stable
+  Det Risk: 40.00 | ML Prob: 0.00 | Delta: -40.00
+  Att Slp: 0.005 | Mk Slp: 17.2
+  Att pct: 71.4 | Avg Mk: 57.9 | Fails: 0
+Student: A24028
+  Deterministic Status: Stable
+  Det Risk: 40.00 | ML Prob: 12.73 | Delta: -27.27
+  Att Slp: -0.010 | Mk Slp: -22.6
+  Att pct: 82.9 | Avg Mk: 70.1 | Fails: 0
+Student: A24030
+  Deterministic Status: Stable
+  Det Risk: 44.00 | ML Prob: 0.00 | Delta: -44.00
+  Att Slp: 0.016 | Mk Slp: 20.1
+  Att pct: 71.4 | Avg Mk: 57.3 | Fails: 1

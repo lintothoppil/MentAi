@@ -1,0 +1,23 @@
+Timetable Handlers:
+Handler: Dr. Vivek Joseph, ID: 18
+Handler: Dr. Neethu George, ID: 19
+
+Faculties:
+ID: 2, Name: Test Mentor
+ID: 3, Name: Test Mentor
+ID: 4, Name: Dr. John Smith
+ID: 5, Name: Dr. Jane Doe
+ID: 6, Name: Dr. Robert Johnson
+ID: 7, Name: Dr. Emily Davis
+ID: 10, Name: Dr. Rajesh Menon
+ID: 11, Name: Dr. Anjali Varma
+ID: 12, Name: Dr. Suresh Pillai
+ID: 13, Name: Dr. Divya Krishnan
+ID: 14, Name: Dr. Nikhil Thomas
+ID: 15, Name: Dr. Lekshmi R
+ID: 16, Name: Dr. Harish Babu
+ID: 17, Name: Dr. Sneha Mathew
+ID: 18, Name: Dr. Vivek Joseph
+ID: 19, Name: Dr. Neethu George
+ID: 20, Name: Dr. MBA Mentor
+ID: 21, Name: Administrator

@@ -1,0 +1,38 @@
+Timetables:
+[Department of Computer Applications] [MCA 2024-2026] Cloud Computing handler=Dr. Vivek Joseph
+[Department of Computer Applications] [MCA 2024-2026] Cloud Computing handler=Dr. Vivek Joseph
+[Department of Computer Applications] [MCA 2024-2026] Data Science handler=None
+[Department of Computer Applications] [MCA 2024-2026] Data Science handler=None
+[Department of Computer Applications] [MCA 2024-2026] Lab handler=None
+[Department of Computer Applications] [MCA 2024-2026] Lab handler=None
+[Department of Computer Applications] [MCA 2024-2026] IoT handler=None
+[Department of Computer Applications] [MCA 2024-2026] IoT handler=None
+[Department of Computer Applications] [MCA 2024-2026] DAA handler=None
+[Department of Computer Applications] [MCA 2024-2026] DAA handler=None
+[Department of Computer Applications] [MCA 2024-2026] Mini Project handler=Dr. Neethu George
+[Department of Computer Applications] [MCA 2024-2026] Mini Project handler=Dr. Neethu George
+[Department of Computer Applications] [MCA 2024-2026] Data Science handler=None
+[Department of Computer Applications] [MCA 2024-2026] Data Science handler=None
+[Department of Computer Applications] [MCA 2024-2026] Cloud Computing handler=Dr. Vivek Joseph
+[Department of Computer Applications] [MCA 2024-2026] Cloud Computing handler=Dr. Vivek Joseph
+[Department of Computer Applications] [MCA 2024-2026] Seminar handler=None
+[Department of Computer Applications] [MCA 2024-2026] Seminar handler=None
+[Department of Computer Applications] [MCA 2024-2026] DAA handler=None
+[Department of Computer Applications] [MCA 2024-2026] DAA handler=None
+[Department of Computer Applications] [MCA 2024-2026] IoT handler=None
+[Department of Computer Applications] [MCA 2024-2026] IoT handler=None
+[Department of Computer Applications] [MCA 2024-2026] Lab handler=None
+[Department of Computer Applications] [MCA 2024-2026] Lab handler=None
+[Department of Computer Applications] [MCA 2024-2026] Mini Project handler=Dr. Neethu George
+[Department of Computer Applications] [MCA 2024-2026] Mini Project handler=Dr. Neethu George
+[Department of Computer Applications] [MCA 2024-2026] Seminar handler=None
+[Department of Computer Applications] [MCA 2024-2026] Seminar handler=None
+[Department of Computer Applications] [MCA 2024-2026] Revision handler=None
+[Department of Computer Applications] [MCA 2024-2026] Revision handler=None
+
+Students:
+Adm: CS2020001, Dept: Computer Science and Engineering (CSE), Batch: 2020-2024
+Adm: A22CSE001, Dept: Computer Science and Engineering (CSE), Batch: 2022-2026
+Adm: A24MCA001, Dept: Department of Computer Applications, Batch: 2024-2026
+Adm: A25MCA001, Dept: Department of Computer Applications, Batch: 2025-2027
+Adm: A23MCA002, Dept: Department of Computer Applications, Batch: MCA 2023-2025

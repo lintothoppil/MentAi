@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "D:\mentAi\student_module\test.py", line 3, in <module>
+    import app
+  File "D:\mentAi\student_module\app.py", line 2990, in <module>
+    from routes.student_routes import student_bp
+  File "D:\mentAi\student_module\routes\student_routes.py", line 4, in <module>
+    from utils.ai import generate_daily_goal, generate_study_plan
+  File "D:\mentAi\student_module\utils\ai.py", line 3, in <module>
+    from anthropic import Anthropic
+ModuleNotFoundError: No module named 'anthropic'

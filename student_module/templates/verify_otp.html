@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Verify OTP</h2>
+<p style="text-align: center;">Enter the 6-digit OTP sent to your email.</p>
+<form method="POST" action="{{ url_for('verify_otp') }}" style="max-width: 400px; margin: 0 auto;">
+    <table>
+        <tr>
+            <th>OTP Code</th>
+            <td><input type="text" name="otp" required maxlength="6"
+                    style="text-align: center; font-size: 18px; letter-spacing: 5px;"></td>
+        </tr>
+    </table>
+    <input type="submit" value="Verify OTP">
+</form>
+{% endblock %}

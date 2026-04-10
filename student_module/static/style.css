@@ -1,0 +1,116 @@
+body {
+    font-family: 'Times New Roman', Times, serif; /* Formal styling */
+    background-color: #f9f9f9;
+    color: #000;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    background-color: #fff;
+    padding: 20px;
+    border: 1px solid #000;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+}
+
+h1, h2, h3 {
+    text-align: center;
+    text-transform: uppercase;
+    border-bottom: 2px solid #000;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+table, th, td {
+    border: 1px solid #000;
+}
+
+th, td {
+    padding: 8px;
+    text-align: left;
+}
+
+th {
+    background-color: #eee;
+    font-weight: bold;
+    width: 30%;
+}
+
+input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="date"], select, textarea {
+    width: 100%;
+    padding: 5px;
+    box-sizing: border-box;
+    border: 1px solid #ccc; /* Slightly softer for inputs */
+    font-family: inherit;
+}
+
+input[type="submit"], button {
+    display: block;
+    width: 200px;
+    margin: 20px auto;
+    padding: 10px;
+    background-color: #333;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+input[type="submit"]:hover, button:hover {
+    background-color: #555;
+}
+
+.alert {
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #000;
+    text-align: center;
+}
+
+.alert.error {
+    background-color: #fdd;
+}
+
+.alert.success {
+    background-color: #dfd;
+}
+
+.alert.info {
+    background-color: #ddf;
+}
+
+a {
+    color: #000;
+    text-decoration: underline;
+}
+
+.form-section {
+    margin-bottom: 30px;
+}
+
+.section-header {
+    background-color: #ddd;
+    padding: 5px;
+    font-weight: bold;
+    border: 1px solid #000;
+    margin-bottom: -1px; /* Overlap border */
+}
+
+.nav-links {
+    text-align: right;
+    margin-bottom: 20px;
+}
+
+.nav-links a {
+    margin-left: 15px;
+}
