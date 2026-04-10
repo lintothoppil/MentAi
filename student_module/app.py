@@ -4044,6 +4044,17 @@ def _get_openai_client():
 
 
 
+def _normalize_batch_label(batch: str) -> str:
+    if not batch:
+        return ""
+    return (
+        batch.replace("MCA ", "")
+             .replace("IMCA ", "")
+             .replace("MBA ", "")
+             .strip()
+    )
+
+
 def _build_student_context(admission_number: str) -> dict:
     """Gather all student metrics and return a structured context dict."""
     student = Student.query.get(admission_number)
@@ -4086,10 +4097,46 @@ def _build_student_context(admission_number: str) -> dict:
     # Study plan compliance
     plan = WeeklyStudyPlan.query.filter_by(student_id=admission_number).order_by(WeeklyStudyPlan.id.desc()).first()
     if plan:
-        total    = sum(s.allocated_hours for s in plan.subjects) if plan.subjects else 0
-        done     = sum(s.completed_hours for s in plan.subjects) if plan.subjects else 0
+        total = sum((s.allocated_hours or 0) for s in plan.subjects) if plan.subjects else 0
+        done = 0.0
+        if plan.subjects:
+            for s in plan.subjects:
+                done += sum((log.hours_completed or 0) for log in s.sessions)
         ctx["study_plan_compliance"] = round((done / total * 100) if total else 0, 1)
-        ctx["study_plan_subjects"]   = [s.subject_name for s in plan.subjects]
+        ctx["study_plan_subjects"] = [
+            (s.subject.name if s.subject and s.subject.name else f"Subject {s.subject_id}")
+            for s in plan.subjects
+        ]
+
+    # Timetable context
+    timetable_entries = []
+    timetable_by_day = {}
+    if student.branch and student.batch:
+        dept = student.branch
+        base_batch = _normalize_batch_label(student.batch)
+        q = Timetable.query.filter(Timetable.department.ilike(f"%{dept}%"))
+        if base_batch:
+            q = q.filter(Timetable.batch.ilike(f"%{base_batch}%"))
+        timetable_entries = q.order_by(Timetable.day, Timetable.period).all()
+
+    for t in timetable_entries:
+        day = t.day or "Unknown"
+        slot = t.time_slot or (f"Period {t.period}" if t.period else "Class")
+        timetable_by_day.setdefault(day, []).append(slot)
+
+    ctx["timetable_by_day"] = timetable_by_day
+    if timetable_by_day:
+        ordered_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        summary_parts = []
+        for d in ordered_days:
+            if d in timetable_by_day:
+                summary_parts.append(f"{d}: {', '.join(timetable_by_day[d])}")
+        for d, slots in timetable_by_day.items():
+            if d not in ordered_days:
+                summary_parts.append(f"{d}: {', '.join(slots)}")
+        ctx["timetable_summary"] = "; ".join(summary_parts)
+    else:
+        ctx["timetable_summary"] = "No timetable data"
 
     return ctx
 
@@ -4099,6 +4146,7 @@ def _context_to_system_prompt(ctx: dict) -> str:
     attend_str = ", ".join(f"{s}: {v}%" for s, v in ctx.get("subject_attendance", {}).items()) or "no data"
     compliance = ctx.get("study_plan_compliance", "N/A")
     subjects_str = ", ".join(ctx.get("study_plan_subjects", [])) or "none"
+    timetable_summary = ctx.get("timetable_summary", "No timetable data")
 
     return f"""You are MentorAI — a highly empathetic, intelligent academic advisor embedded in a student academic management system.
 
@@ -4114,6 +4162,7 @@ STUDENT PROFILE (use this to give personalised, data-driven advice):
 - Academic Status: {ctx.get('academic_status', 'N/A')}
 - Study Plan Compliance: {compliance}%
 - Current Study Plan Subjects: {subjects_str}
+- Timetable Summary: {timetable_summary}
 
 INSTRUCTIONS:
 - Always refer to the student by name when appropriate.
@@ -4318,6 +4367,7 @@ def api_ai_study_plan(admission_number):
     try:
         marks_dict  = ctx.get('subject_marks', {})
         attend_dict = ctx.get('subject_attendance', {})
+        timetable_summary = ctx.get('timetable_summary', 'No timetable data')
         marks_str   = "; ".join(f"{s}: {v}/100" for s, v in marks_dict.items()) or "no marks data"
         attend_str  = "; ".join(f"{s}: {v}%" for s, v in attend_dict.items()) or "no attendance data"
 
@@ -4328,6 +4378,7 @@ Name: {ctx.get('name')}
 Department: {ctx.get('department')}
 Subject Marks: {marks_str}
 Subject Attendance: {attend_str}
+Current Timetable: {timetable_summary}
 Risk Level: {ctx.get('risk_level', 'stable')}
 Academic Status: {ctx.get('academic_status', 'Stable')}
 
@@ -4335,6 +4386,7 @@ Format:
 ## 📅 Weekly Study Plan for {ctx.get('name')}
 ### Day-by-Day Schedule (Monday–Sunday)
 For each day list 2-3 study blocks with subject, duration, and specific topic goal.
+Align study blocks around timetable commitments and avoid class hours.
 ### 🎯 Key Focus Areas This Week
 ### 💡 Study Tips
 Keep it motivating and actionable."""
@@ -4369,12 +4421,31 @@ def _fallback_study_plan(ctx: dict) -> str:
         secondary = subs[(i + 1) % len(subs)] if len(subs) > 1 else primary
         day_targets[day] = (primary, secondary)
 
+    timetable_by_day = ctx.get("timetable_by_day", {}) or {}
     plan_lines = [f"## 📅 Weekly Study Plan for {name}\n"]
     for day, (p, s) in day_targets.items():
+        class_slots = timetable_by_day.get(day, [])
+        class_note = f"- 🏫 **Class Hours**: {', '.join(class_slots)}\n" if class_slots else ""
         if day == "Sunday":
-            plan_lines.append(f"### {day}\n- 🔄 **Revision**: Review all subjects covered this week\n- 📝 **Self-test**: 30-minute quiz on weakest topic\n")
+            plan_lines.append(
+                f"### {day}\n"
+                f"{class_note}"
+                f"- 🔄 **Revision**: Review all subjects covered this week\n"
+                f"- 📝 **Self-test**: 30-minute quiz on weakest topic\n"
+            )
+        elif class_slots:
+            plan_lines.append(
+                f"### {day}\n"
+                f"{class_note}"
+                f"- 🌅 **6:00–7:30 AM** — **{p}** (1.5 hrs) — Pre-class concept revision\n"
+                f"- 🌇 **6:30–8:00 PM** — **{s}** (1.5 hrs) — Problem practice & recap\n"
+            )
         else:
-            plan_lines.append(f"### {day}\n- 🌅 **9:00–11:00 AM** — **{p}** (2 hrs) — Focus on theory & past questions\n- 🌇 **5:00–6:00 PM** — **{s}** (1 hr) — Practice problems\n")
+            plan_lines.append(
+                f"### {day}\n"
+                f"- 🌅 **9:00–11:00 AM** — **{p}** (2 hrs) — Focus on theory & past questions\n"
+                f"- 🌇 **5:00–6:00 PM** — **{s}** (1 hr) — Practice problems\n"
+            )
 
     plan_lines.append("### 🎯 Key Focus Areas\n" + "\n".join(f"- **{s}** ({v}/100) — needs most attention" for s, v in sorted_subs[:3]))
     plan_lines.append("\n### 💡 Study Tips\n- Study high-priority subjects in the morning when focus is sharpest.\n- Use the 25-minute Pomodoro technique with 5-minute breaks.\n- Log every session in the Weekly Planner tab.")
@@ -4770,4 +4841,3 @@ if __name__ == '__main__':
             print("Migration error:", e)
 
     app.run(debug=True, port=5000)
-
