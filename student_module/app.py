@@ -4,7 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from flask_mail import Mail
 from flask_bcrypt import Bcrypt
 from dotenv import load_dotenv
-from models import db, Student, Faculty, Timetable, LoginCredential, Parent, Guardian, Academic, OtherInfo, WorkExperience, Note, Course, Semester, Subject, SubjectAllocation, InternalMark, UniversityMark, Attendance, MentoringSession, MentorLeave, LeaveRequest, Activity, DailyAttendance, StudentAttendance, Alert, WeeklyStudyPlan, StudyPlanSubject, StudySessionLog, MentorIntervention, InterventionOutcome, Batch, AlumniStudent, AlumniMentorHistory, Notification
+from models import db, Student, Faculty, Timetable, LoginCredential, Parent, Guardian, Academic, OtherInfo, WorkExperience, Note, Course, Semester, Subject, SubjectAllocation, InternalMark, UniversityMark, Attendance, MentoringSession, MentorLeave, LeaveRequest, Activity, DailyAttendance, StudentAttendance, Alert, WeeklyStudyPlan, StudyPlanSubject, StudySessionLog, StudentWellnessPreference, WorkoutSessionLog, MentorIntervention, InterventionOutcome, Batch, AlumniStudent, AlumniMentorHistory, Notification
 from analytics.engine import run_full_analysis
 from utils import send_otp_email, generate_otp, get_department_from_admission, normalize_dept_name
 from datetime import datetime
@@ -784,6 +784,19 @@ def api_get_profile(admission_number):
             'work_experience': [],
             'other_info': {}
         }
+
+        wp = StudentWellnessPreference.query.filter_by(student_id=admission_number).first()
+        data['wellness_preferences'] = {
+            'wake_time': wp.wake_time if wp and wp.wake_time else "06:00",
+            'sleep_time': wp.sleep_time if wp and wp.sleep_time else "22:30",
+            'workout_duration_minutes': wp.workout_duration_minutes if wp and wp.workout_duration_minutes else 30,
+            'fitness_goal': wp.fitness_goal if wp and wp.fitness_goal else "general_fitness",
+            'intensity_level': wp.intensity_level if wp and wp.intensity_level else "moderate",
+            'home_equipment': wp.home_equipment if wp and wp.home_equipment else "none",
+            'health_constraints': wp.health_constraints if wp and wp.health_constraints else "",
+            'preferred_workout_time': wp.preferred_workout_time if wp and wp.preferred_workout_time else "evening",
+            'weekly_workout_target': wp.weekly_workout_target if wp and wp.weekly_workout_target else 4
+        }
         
         # Serialize Nested Relationships
         if student.parents:
@@ -991,6 +1004,30 @@ def api_complete_profile():
         other.vehicle_number = other_data.get('vehicle_number')
         
         db.session.add(other)
+
+        # Wellness preferences
+        wp_data = data.get('wellness_preferences', {})
+        wp = StudentWellnessPreference.query.filter_by(student_id=admission_number).first()
+        if not wp:
+            wp = StudentWellnessPreference(student_id=admission_number)
+        try:
+            workout_duration = int(wp_data.get('workout_duration_minutes') or 30)
+        except (TypeError, ValueError):
+            workout_duration = 30
+        try:
+            workout_target = int(wp_data.get('weekly_workout_target') or 4)
+        except (TypeError, ValueError):
+            workout_target = 4
+        wp.wake_time = wp_data.get('wake_time') or "06:00"
+        wp.sleep_time = wp_data.get('sleep_time') or "22:30"
+        wp.workout_duration_minutes = max(15, min(90, workout_duration))
+        wp.fitness_goal = wp_data.get('fitness_goal') or "general_fitness"
+        wp.intensity_level = wp_data.get('intensity_level') or "moderate"
+        wp.home_equipment = wp_data.get('home_equipment') or "none"
+        wp.health_constraints = wp_data.get('health_constraints') or ""
+        wp.preferred_workout_time = wp_data.get('preferred_workout_time') or "evening"
+        wp.weekly_workout_target = max(1, min(7, workout_target))
+        db.session.add(wp)
 
         student.profile_completed = True
         db.session.commit()
@@ -2820,6 +2857,98 @@ def api_log_session():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@app.route('/api/planner/log-workout-session', methods=['POST'])
+def api_log_workout_session():
+    try:
+        data = request.json or {}
+        student_id = data.get('student_id')
+        duration_minutes = data.get('duration_minutes', 0)
+        workout_type = data.get('workout_type', 'home_workout')
+        intensity = data.get('intensity', 'moderate')
+        completed = bool(data.get('completed', True))
+        notes = data.get('notes', '')
+
+        if not student_id:
+            return jsonify({'success': False, 'message': 'student_id required'}), 400
+
+        student = Student.query.get(student_id)
+        if not student:
+            return jsonify({'success': False, 'message': 'Student not found'}), 404
+
+        try:
+            minutes = int(duration_minutes)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'message': 'Invalid duration_minutes'}), 400
+
+        if minutes <= 0 or minutes > 180:
+            return jsonify({'success': False, 'message': 'duration_minutes must be between 1 and 180'}), 400
+
+        log = WorkoutSessionLog(
+            student_id=student_id,
+            date=datetime.utcnow().date(),
+            duration_minutes=minutes,
+            workout_type=workout_type,
+            intensity=intensity,
+            completed=completed,
+            notes=notes[:255] if notes else None
+        )
+        db.session.add(log)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Workout session logged successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/planner/workout-compliance/<string:student_id>', methods=['GET'])
+def api_workout_compliance(student_id):
+    try:
+        student = Student.query.get(student_id)
+        if not student:
+            return jsonify({'success': False, 'message': 'Student not found'}), 404
+
+        today = datetime.utcnow().date()
+        week_start = today - timedelta(days=today.weekday())
+        week_end = week_start + timedelta(days=6)
+
+        wp = StudentWellnessPreference.query.filter_by(student_id=student_id).first()
+        weekly_workout_target = wp.weekly_workout_target if wp and wp.weekly_workout_target else 4
+
+        logs = WorkoutSessionLog.query.filter(
+            WorkoutSessionLog.student_id == student_id,
+            WorkoutSessionLog.date >= week_start,
+            WorkoutSessionLog.date <= week_end,
+            WorkoutSessionLog.completed.is_(True)
+        ).all()
+
+        workout_sessions_done = len(logs)
+        workout_minutes_done = sum((l.duration_minutes or 0) for l in logs)
+        workout_compliance = round((workout_sessions_done / weekly_workout_target) * 100, 1) if weekly_workout_target else 0.0
+
+        study_plan = WeeklyStudyPlan.query.filter_by(student_id=student_id, week_start=week_start).first()
+        study_compliance = 0.0
+        if study_plan:
+            allocated = sum((s.allocated_hours or 0) for s in study_plan.subjects)
+            completed_hours = sum(sum((log.hours_completed or 0) for log in s.sessions) for s in study_plan.subjects)
+            study_compliance = round((completed_hours / allocated) * 100, 1) if allocated else 0.0
+
+        balanced_routine_score = round((study_compliance * 0.65) + (min(100.0, workout_compliance) * 0.35), 1)
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'week_start': week_start.isoformat(),
+                'week_end': week_end.isoformat(),
+                'study_compliance': study_compliance,
+                'workout_compliance': min(100.0, workout_compliance),
+                'balanced_routine_score': balanced_routine_score,
+                'workout_sessions_done': workout_sessions_done,
+                'workout_target': weekly_workout_target,
+                'workout_minutes_done': workout_minutes_done
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @app.route('/api/planner/mentor/<int:mentor_id>', methods=['GET'])
 def api_get_mentor_planner(mentor_id):
     try:
@@ -4112,6 +4241,36 @@ def _build_student_context(admission_number: str) -> dict:
             for s in plan.subjects
         ]
 
+    # Wellness preferences + workout consistency
+    wp = StudentWellnessPreference.query.filter_by(student_id=admission_number).first()
+    ctx["wellness_preferences"] = {
+        "wake_time": wp.wake_time if wp and wp.wake_time else "06:00",
+        "sleep_time": wp.sleep_time if wp and wp.sleep_time else "22:30",
+        "workout_duration_minutes": wp.workout_duration_minutes if wp and wp.workout_duration_minutes else 30,
+        "fitness_goal": wp.fitness_goal if wp and wp.fitness_goal else "general_fitness",
+        "intensity_level": wp.intensity_level if wp and wp.intensity_level else "moderate",
+        "home_equipment": wp.home_equipment if wp and wp.home_equipment else "none",
+        "health_constraints": wp.health_constraints if wp and wp.health_constraints else "",
+        "preferred_workout_time": wp.preferred_workout_time if wp and wp.preferred_workout_time else "evening",
+        "weekly_workout_target": wp.weekly_workout_target if wp and wp.weekly_workout_target else 4,
+    }
+
+    today = datetime.utcnow().date()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+    logs = WorkoutSessionLog.query.filter(
+        WorkoutSessionLog.student_id == admission_number,
+        WorkoutSessionLog.date >= week_start,
+        WorkoutSessionLog.date <= week_end,
+        WorkoutSessionLog.completed.is_(True)
+    ).all()
+    workout_sessions = len(logs)
+    workout_minutes = sum((l.duration_minutes or 0) for l in logs)
+    target = ctx["wellness_preferences"]["weekly_workout_target"]
+    ctx["workout_consistency"] = round((workout_sessions / target * 100) if target else 0, 1)
+    ctx["workout_sessions_this_week"] = workout_sessions
+    ctx["workout_minutes_this_week"] = workout_minutes
+
     # Timetable context
     timetable_entries = []
     timetable_by_day = {}
@@ -4151,6 +4310,15 @@ def _context_to_system_prompt(ctx: dict) -> str:
     compliance = ctx.get("study_plan_compliance", "N/A")
     subjects_str = ", ".join(ctx.get("study_plan_subjects", [])) or "none"
     timetable_summary = ctx.get("timetable_summary", "No timetable data")
+    wp = ctx.get("wellness_preferences", {})
+    wellness_str = (
+        f"Wake: {wp.get('wake_time', '06:00')}, Sleep: {wp.get('sleep_time', '22:30')}, "
+        f"Goal: {wp.get('fitness_goal', 'general_fitness')}, "
+        f"Intensity: {wp.get('intensity_level', 'moderate')}, "
+        f"Preferred Workout: {wp.get('preferred_workout_time', 'evening')}, "
+        f"Duration: {wp.get('workout_duration_minutes', 30)} mins, "
+        f"Equipment: {wp.get('home_equipment', 'none')}"
+    )
 
     return f"""You are MentorAI — a highly empathetic, intelligent academic advisor embedded in a student academic management system.
 
@@ -4167,12 +4335,15 @@ STUDENT PROFILE (use this to give personalised, data-driven advice):
 - Study Plan Compliance: {compliance}%
 - Current Study Plan Subjects: {subjects_str}
 - Timetable Summary: {timetable_summary}
+- Wellness Preferences: {wellness_str}
+- Workout Consistency This Week: {ctx.get('workout_consistency', 'N/A')}%
 
 INSTRUCTIONS:
 - Always refer to the student by name when appropriate.
 - Ground every recommendation in the actual data above.
 - Be concise, actionable, and motivating.
 - If asked for a study plan, produce a structured weekly plan in Markdown.
+- If asked for workout guidance, provide only general wellness guidance and include a brief note that this is not medical advice.
 - If asked a general academic question, answer it clearly.
 - Never hallucinate data — if something is N/A, say so honestly.
 - Format responses in clean Markdown with headers, bullets, and bold text.
@@ -4338,6 +4509,17 @@ def _fallback_chat(message: str, ctx: dict) -> str:
     if any(w in msg for w in ['mentor', 'meeting', 'session', 'book']):
         return f"You can book a mentoring session from the **Mentoring** tab in your dashboard. Sessions from 9 AM–5 PM are auto-approved if your mentor is free. Evening slots (5–7 PM) need mentor confirmation."
 
+    if any(w in msg for w in ['workout', 'fitness', 'exercise', 'home workout']):
+        wp = ctx.get('wellness_preferences', {})
+        return (
+            f"Based on your preferences, try a **{wp.get('intensity_level', 'moderate')}** "
+            f"{wp.get('workout_duration_minutes', 30)}-minute home workout in the "
+            f"**{wp.get('preferred_workout_time', 'evening')}** focused on "
+            f"**{wp.get('fitness_goal', 'general fitness')}**. "
+            f"Keep one recovery day after intense sessions. "
+            f"Note: this is general wellness guidance, not medical advice."
+        )
+
     if any(w in msg for w in ['tip', 'advice', 'suggest', 'help', 'improve']):
         att = ctx.get('attendance_pct', 75)
         avg = ctx.get('avg_marks', 60)
@@ -4379,10 +4561,19 @@ def api_ai_study_plan(admission_number):
         marks_dict  = ctx.get('subject_marks', {})
         attend_dict = ctx.get('subject_attendance', {})
         timetable_summary = ctx.get('timetable_summary', 'No timetable data')
+        wp = ctx.get('wellness_preferences', {})
         marks_str   = "; ".join(f"{s}: {v}/100" for s, v in marks_dict.items()) or "no marks data"
         attend_str  = "; ".join(f"{s}: {v}%" for s, v in attend_dict.items()) or "no attendance data"
+        workout_pref = (
+            f"goal={wp.get('fitness_goal', 'general_fitness')}, "
+            f"intensity={wp.get('intensity_level', 'moderate')}, "
+            f"preferred_time={wp.get('preferred_workout_time', 'evening')}, "
+            f"duration={wp.get('workout_duration_minutes', 30)} mins, "
+            f"equipment={wp.get('home_equipment', 'none')}, "
+            f"constraints={wp.get('health_constraints', '') or 'none'}"
+        )
 
-        prompt = f"""Create a detailed 7-day weekly study plan in Markdown for a student with the following academic profile. 
+        prompt = f"""Create a detailed 7-day weekly study plan in Markdown for a student with the following academic and wellness profile. 
 Be specific with daily time blocks and subject allocations. Prioritize subjects with low marks.
 
 Name: {ctx.get('name')}
@@ -4392,15 +4583,17 @@ Subject Attendance: {attend_str}
 Current Timetable: {timetable_summary}
 Risk Level: {ctx.get('risk_level', 'stable')}
 Academic Status: {ctx.get('academic_status', 'Stable')}
+Workout Preferences: {workout_pref}
 
 Format:
 ## 📅 Weekly Study Plan for {ctx.get('name')}
 ### Day-by-Day Schedule (Monday–Sunday)
-For each day list 2-3 study blocks with subject, duration, and specific topic goal.
+For each day list 2-3 study blocks with subject, duration, and specific topic goal, plus one short home workout slot where practical.
 Align study blocks around timetable commitments and avoid class hours.
 ### 🎯 Key Focus Areas This Week
+### 🏃 Home Workout Guidance
 ### 💡 Study Tips
-Keep it motivating and actionable."""
+Keep it motivating and actionable. Add one sentence that this is general wellness guidance, not medical advice."""
 
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -4422,6 +4615,17 @@ Keep it motivating and actionable."""
 def _fallback_study_plan(ctx: dict) -> str:
     marks_dict = ctx.get('subject_marks', {})
     name = ctx.get('name', 'Student')
+    wp = ctx.get('wellness_preferences', {})
+    workout_duration = int(wp.get('workout_duration_minutes', 30) or 30)
+    preferred_slot = wp.get('preferred_workout_time', 'evening')
+    workout_label = "🏃 Home Workout"
+    if preferred_slot == "morning":
+        workout_time = "6:00–6:30 AM"
+    elif preferred_slot == "afternoon":
+        workout_time = "4:30–5:00 PM"
+    else:
+        workout_time = "7:30–8:00 PM"
+
     sorted_subs = sorted(marks_dict.items(), key=lambda x: x[1]) if marks_dict else []
 
     day_targets = {}
@@ -4444,6 +4648,7 @@ def _fallback_study_plan(ctx: dict) -> str:
                 f"{class_note}"
                 f"- 🔄 **Revision**: Review all subjects covered this week\n"
                 f"- 📝 **Self-test**: 30-minute quiz on weakest topic\n"
+                f"- {workout_label}: Light mobility + stretching ({max(20, workout_duration - 10)} mins)\n"
             )
         elif class_slots:
             plan_lines.append(
@@ -4451,17 +4656,162 @@ def _fallback_study_plan(ctx: dict) -> str:
                 f"{class_note}"
                 f"- 🌅 **6:00–7:30 AM** — **{p}** (1.5 hrs) — Pre-class concept revision\n"
                 f"- 🌇 **6:30–8:00 PM** — **{s}** (1.5 hrs) — Problem practice & recap\n"
+                f"- {workout_label}: {workout_time} ({workout_duration} mins)\n"
             )
         else:
             plan_lines.append(
                 f"### {day}\n"
                 f"- 🌅 **9:00–11:00 AM** — **{p}** (2 hrs) — Focus on theory & past questions\n"
                 f"- 🌇 **5:00–6:00 PM** — **{s}** (1 hr) — Practice problems\n"
+                f"- {workout_label}: {workout_time} ({workout_duration} mins)\n"
             )
 
     plan_lines.append("### 🎯 Key Focus Areas\n" + "\n".join(f"- **{s}** ({v}/100) — needs most attention" for s, v in sorted_subs[:3]))
+    plan_lines.append(
+        f"\n### 🏃 Home Workout Guidance\n"
+        f"- Goal: **{wp.get('fitness_goal', 'general_fitness')}**\n"
+        f"- Intensity: **{wp.get('intensity_level', 'moderate')}**\n"
+        f"- Equipment: **{wp.get('home_equipment', 'none')}**\n"
+        f"- Constraints: **{wp.get('health_constraints', 'none') or 'none'}**\n"
+    )
     plan_lines.append("\n### 💡 Study Tips\n- Study high-priority subjects in the morning when focus is sharpest.\n- Use the 25-minute Pomodoro technique with 5-minute breaks.\n- Log every session in the Weekly Planner tab.")
+    plan_lines.append("\n> Note: Home workout suggestions are general wellness guidance and not medical advice.")
     return "\n".join(plan_lines)
+
+
+def _build_combined_study_workout_schedule(ctx: dict, mode: str = "balanced") -> dict:
+    days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    today = datetime.utcnow().date()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+
+    wp = ctx.get("wellness_preferences", {})
+    wake_time = wp.get("wake_time", "06:00")
+    sleep_time = wp.get("sleep_time", "22:30")
+    workout_duration = int(wp.get("workout_duration_minutes", 30) or 30)
+    weekly_workout_target = int(wp.get("weekly_workout_target", 4) or 4)
+    preferred_workout_time = wp.get("preferred_workout_time", "evening")
+    fitness_goal = wp.get("fitness_goal", "general_fitness")
+    intensity = wp.get("intensity_level", "moderate")
+    constraints = wp.get("health_constraints", "") or "none"
+
+    if mode == "exam_week":
+        study_hours_per_day = 3.5
+        workout_duration = max(15, min(25, workout_duration))
+    elif mode == "light_workout":
+        study_hours_per_day = 3.0
+        workout_duration = max(15, workout_duration - 10)
+    elif mode == "revision_priority":
+        study_hours_per_day = 3.8
+    else:
+        study_hours_per_day = 2.8
+
+    subject_marks = ctx.get("subject_marks", {})
+    weak_first_subjects = [s for s, _ in sorted(subject_marks.items(), key=lambda x: x[1])]
+    if not weak_first_subjects:
+        weak_first_subjects = ctx.get("study_plan_subjects", []) or ["General Study"]
+
+    timetable_by_day = ctx.get("timetable_by_day", {})
+    workout_days = {"Monday", "Tuesday", "Thursday", "Friday", "Saturday"}
+    if weekly_workout_target <= 3:
+        workout_days = {"Monday", "Wednesday", "Friday"}
+    elif weekly_workout_target >= 6:
+        workout_days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+
+    out_days = []
+    sub_idx = 0
+    previous_high_load = False
+    for offset, day in enumerate(days):
+        d = week_start + timedelta(days=offset)
+        class_slots = timetable_by_day.get(day, [])
+        primary = weak_first_subjects[sub_idx % len(weak_first_subjects)]
+        secondary = weak_first_subjects[(sub_idx + 1) % len(weak_first_subjects)]
+        sub_idx += 1
+
+        morning_study_duration = round(study_hours_per_day * 0.6, 1)
+        evening_study_duration = round(study_hours_per_day * 0.4, 1)
+
+        study_blocks = [
+            {
+                "time": "06:15-07:45",
+                "subject": primary,
+                "duration_hours": morning_study_duration,
+                "focus": "Concept revision + weak-topic practice"
+            },
+            {
+                "time": "19:00-20:00",
+                "subject": secondary,
+                "duration_hours": evening_study_duration,
+                "focus": "Problem solving + recap"
+            }
+        ]
+
+        workout_blocks = []
+        is_recovery_day = previous_high_load or day == "Sunday"
+        if day in workout_days:
+            if preferred_workout_time == "morning":
+                workout_time = "05:40-06:10"
+            elif preferred_workout_time == "afternoon":
+                workout_time = "16:30-17:00"
+            else:
+                workout_time = "20:15-20:45"
+
+            block_intensity = "light" if is_recovery_day else intensity
+            block_duration = max(15, workout_duration - 10) if is_recovery_day else workout_duration
+            workout_blocks.append({
+                "time": workout_time,
+                "type": "home_workout",
+                "goal": fitness_goal,
+                "intensity": block_intensity,
+                "duration_minutes": block_duration
+            })
+            previous_high_load = block_intensity in ("high", "moderate")
+        else:
+            previous_high_load = False
+
+        out_days.append({
+            "day": day,
+            "date": d.isoformat(),
+            "class_hours": class_slots,
+            "study_blocks": study_blocks,
+            "workout_blocks": workout_blocks,
+            "break_guidance": "Use 25-minute Pomodoro blocks with 5-minute breaks.",
+            "sleep_guidance": f"Aim to sleep by {sleep_time} and wake around {wake_time}.",
+            "recovery_day": is_recovery_day
+        })
+
+    total_study_target = round(sum(sum(b["duration_hours"] for b in d["study_blocks"]) for d in out_days), 1)
+    total_workout_target = sum(len(d["workout_blocks"]) for d in out_days)
+
+    return {
+        "week_start": week_start.isoformat(),
+        "week_end": week_end.isoformat(),
+        "mode": mode,
+        "wellness_note": "Home workout suggestions are general wellness guidance, not medical advice.",
+        "constraints_note": constraints,
+        "weekly_targets": {
+            "study_hours_target": total_study_target,
+            "workout_sessions_target": total_workout_target
+        },
+        "days": out_days
+    }
+
+
+@app.route('/api/ai/combined-plan/<string:admission_number>', methods=['GET'])
+def api_ai_combined_plan(admission_number):
+    try:
+        mode = (request.args.get('mode') or 'balanced').strip().lower()
+        if mode not in {'balanced', 'exam_week', 'light_workout', 'revision_priority'}:
+            mode = 'balanced'
+
+        ctx = _build_student_context(admission_number)
+        if not ctx:
+            return jsonify({'success': False, 'message': 'Student not found'}), 404
+
+        schedule = _build_combined_study_workout_schedule(ctx, mode=mode)
+        return jsonify({'success': True, 'source': 'rule-based', 'data': schedule}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 

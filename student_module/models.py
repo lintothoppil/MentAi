@@ -483,6 +483,52 @@ class StudySessionLog(db.Model):
 
     plan_subject = db.relationship("StudyPlanSubject", backref="sessions")
 
+class StudentWellnessPreference(db.Model):
+    __tablename__ = "student_wellness_preferences"
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(
+        db.String(20),
+        db.ForeignKey("students.admission_number"),
+        nullable=False,
+        unique=True
+    )
+
+    wake_time = db.Column(db.String(10), default="06:00")
+    sleep_time = db.Column(db.String(10), default="22:30")
+    workout_duration_minutes = db.Column(db.Integer, default=30)
+    fitness_goal = db.Column(db.String(30), default="general_fitness")
+    intensity_level = db.Column(db.String(20), default="moderate")
+    home_equipment = db.Column(db.String(30), default="none")
+    health_constraints = db.Column(db.Text, default="")
+    preferred_workout_time = db.Column(db.String(20), default="evening")
+    weekly_workout_target = db.Column(db.Integer, default=4)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    student = db.relationship(
+        "Student",
+        backref=db.backref("wellness_preference", uselist=False)
+    )
+
+class WorkoutSessionLog(db.Model):
+    __tablename__ = "workout_session_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(
+        db.String(20),
+        db.ForeignKey("students.admission_number"),
+        nullable=False
+    )
+    date = db.Column(db.Date, nullable=False)
+    duration_minutes = db.Column(db.Integer, nullable=False, default=0)
+    workout_type = db.Column(db.String(50), default="home_workout")
+    intensity = db.Column(db.String(20), default="moderate")
+    completed = db.Column(db.Boolean, default=True)
+    notes = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    student = db.relationship("Student", backref="workout_logs")
+
 class MentorIntervention(db.Model):
     __tablename__ = "mentor_interventions"
 
@@ -660,4 +706,3 @@ class MentorMessage(db.Model):
     sender_role = db.Column(db.String(20)) # mentor or student
     sent_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_read = db.Column(db.Boolean, default=False)
-

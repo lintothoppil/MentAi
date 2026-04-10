@@ -167,13 +167,14 @@ const StudentProfile = () => {
                     </div>
                 </div>
 
-                <Tabs defaultValue="personal" className="w-full">
-                    <TabsList className="grid w-full grid-cols-5 lg:w-[600px]">
+                    <Tabs defaultValue="personal" className="w-full">
+                    <TabsList className="grid w-full grid-cols-6 lg:w-[760px]">
                         <TabsTrigger value="personal">Personal</TabsTrigger>
                         <TabsTrigger value="parents">Parents</TabsTrigger>
                         <TabsTrigger value="accommodation">Accommodation</TabsTrigger>
                         <TabsTrigger value="academics">Academics</TabsTrigger>
                         <TabsTrigger value="other">Other</TabsTrigger>
+                        <TabsTrigger value="wellness">Wellness</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="personal">
@@ -382,6 +383,118 @@ const StudentProfile = () => {
                                     <div className="space-y-2">
                                         <Label>Hobbies</Label>
                                         <Input value={formData.other_info?.hobbies || ''} onChange={(e) => handleNestedChange('other_info', 'hobbies', e.target.value)} />
+                                    </div>
+                                </fieldset>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="wellness">
+                        <Card>
+                            <CardHeader><CardTitle>Wellness & Workout Preferences</CardTitle></CardHeader>
+                            <CardContent>
+                                <fieldset disabled={!isEditing} className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Wake Time</Label>
+                                            <Input
+                                                type="time"
+                                                value={formData.wellness_preferences?.wake_time || "06:00"}
+                                                onChange={(e) => handleNestedChange("wellness_preferences", "wake_time", e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Sleep Time</Label>
+                                            <Input
+                                                type="time"
+                                                value={formData.wellness_preferences?.sleep_time || "22:30"}
+                                                onChange={(e) => handleNestedChange("wellness_preferences", "sleep_time", e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Workout Duration (minutes)</Label>
+                                            <Input
+                                                type="number"
+                                                min={15}
+                                                max={90}
+                                                value={formData.wellness_preferences?.workout_duration_minutes || 30}
+                                                onChange={(e) => handleNestedChange("wellness_preferences", "workout_duration_minutes", e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Weekly Workout Target (sessions)</Label>
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                max={7}
+                                                value={formData.wellness_preferences?.weekly_workout_target || 4}
+                                                onChange={(e) => handleNestedChange("wellness_preferences", "weekly_workout_target", e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Fitness Goal</Label>
+                                            <Select
+                                                value={formData.wellness_preferences?.fitness_goal || "general_fitness"}
+                                                onValueChange={(v) => handleNestedChange("wellness_preferences", "fitness_goal", v)}
+                                            >
+                                                <SelectTrigger><SelectValue placeholder="Select goal" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="fat_loss">Fat Loss</SelectItem>
+                                                    <SelectItem value="strength">Strength</SelectItem>
+                                                    <SelectItem value="flexibility">Flexibility</SelectItem>
+                                                    <SelectItem value="general_fitness">General Fitness</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Intensity Level</Label>
+                                            <Select
+                                                value={formData.wellness_preferences?.intensity_level || "moderate"}
+                                                onValueChange={(v) => handleNestedChange("wellness_preferences", "intensity_level", v)}
+                                            >
+                                                <SelectTrigger><SelectValue placeholder="Select intensity" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="light">Light</SelectItem>
+                                                    <SelectItem value="moderate">Moderate</SelectItem>
+                                                    <SelectItem value="high">High</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Home Equipment</Label>
+                                            <Select
+                                                value={formData.wellness_preferences?.home_equipment || "none"}
+                                                onValueChange={(v) => handleNestedChange("wellness_preferences", "home_equipment", v)}
+                                            >
+                                                <SelectTrigger><SelectValue placeholder="Select equipment" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">None</SelectItem>
+                                                    <SelectItem value="basic">Basic (mat/bands/dumbbells)</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Preferred Workout Time</Label>
+                                            <Select
+                                                value={formData.wellness_preferences?.preferred_workout_time || "evening"}
+                                                onValueChange={(v) => handleNestedChange("wellness_preferences", "preferred_workout_time", v)}
+                                            >
+                                                <SelectTrigger><SelectValue placeholder="Select slot" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="morning">Morning</SelectItem>
+                                                    <SelectItem value="afternoon">Afternoon</SelectItem>
+                                                    <SelectItem value="evening">Evening</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Health Constraints (optional)</Label>
+                                        <Input
+                                            value={formData.wellness_preferences?.health_constraints || ""}
+                                            onChange={(e) => handleNestedChange("wellness_preferences", "health_constraints", e.target.value)}
+                                            placeholder="e.g., knee pain, lower-back sensitivity"
+                                        />
                                     </div>
                                 </fieldset>
                             </CardContent>

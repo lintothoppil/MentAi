@@ -4,7 +4,7 @@ import {
     LayoutDashboard, BarChart3, Calendar, FileText, Bell,
     Upload, Brain, Users, Send, Loader2, Sparkles, BookOpen,
     RefreshCw, Zap, MessageSquare, TrendingUp, TrendingDown,
-    Minus, AlertTriangle, CheckCircle2, Info, Lightbulb, X,
+    Minus, AlertTriangle, CheckCircle2, Info, Lightbulb, X, Dumbbell,
 } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,6 +28,26 @@ const navItems = [
 // ─── types ─────────────────────────────────────────────────────────
 interface InsightCard { title: string; body: string; type: string; icon: string }
 interface ChatMsg      { role: "user" | "assistant"; content: string; ts: Date }
+interface CombinedBlock {
+    time: string;
+    subject?: string;
+    focus?: string;
+    duration_hours?: number;
+    type?: string;
+    goal?: string;
+    intensity?: string;
+    duration_minutes?: number;
+}
+interface CombinedDayPlan {
+    day: string;
+    date: string;
+    class_hours: string[];
+    study_blocks: CombinedBlock[];
+    workout_blocks: CombinedBlock[];
+    break_guidance: string;
+    sleep_guidance: string;
+    recovery_day: boolean;
+}
 
 // ─── card theme map ────────────────────────────────────────────────
 const THEMES: Record<string, { grad: string; glow: string; iconComp: typeof AlertTriangle; text: string }> = {
@@ -76,6 +96,13 @@ export default function StudentInsightsPage() {
     const [planLoading, setPlanLoading]   = useState(false);
     const [planSource, setPlanSource]     = useState("");
     const [planOpen, setPlanOpen]         = useState(false);
+    const [combinedPlanOpen, setCombinedPlanOpen] = useState(false);
+    const [combinedPlanLoading, setCombinedPlanLoading] = useState(false);
+    const [combinedMode, setCombinedMode] = useState<"balanced" | "exam_week" | "light_workout" | "revision_priority">("balanced");
+    const [combinedDays, setCombinedDays] = useState<CombinedDayPlan[]>([]);
+    const [combinedTargets, setCombinedTargets] = useState<{ study_hours_target: number; workout_sessions_target: number } | null>(null);
+    const [wellnessNote, setWellnessNote] = useState("");
+    const [compliance, setCompliance] = useState<{ study_compliance: number; workout_compliance: number; balanced_routine_score: number } | null>(null);
     const [expandCard, setExpandCard]     = useState<number | null>(null);
     const chatEnd = useRef<HTMLDivElement>(null);
 
@@ -92,6 +119,21 @@ export default function StudentInsightsPage() {
     }, [admNo]);
 
     useEffect(() => { fetchInsights(); }, [fetchInsights]);
+    useEffect(() => {
+        if (!admNo) return;
+        fetch(`${API_BASE}/api/planner/workout-compliance/${admNo}`)
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    setCompliance({
+                        study_compliance: d.data.study_compliance ?? 0,
+                        workout_compliance: d.data.workout_compliance ?? 0,
+                        balanced_routine_score: d.data.balanced_routine_score ?? 0,
+                    });
+                }
+            })
+            .catch(() => {});
+    }, [admNo]);
 
     // scroll chat
     useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
@@ -150,6 +192,64 @@ export default function StudentInsightsPage() {
             setPlan("Failed to generate. Please try again.");
         }
         finally { setPlanLoading(false); }
+    };
+
+    const genCombinedPlan = async (mode = combinedMode) => {
+        if (!admNo || combinedPlanLoading) return;
+        setCombinedPlanLoading(true);
+        setCombinedPlanOpen(true);
+        try {
+            const r = await fetch(`${API_BASE}/api/ai/combined-plan/${admNo}?mode=${mode}&_ts=${Date.now()}`, {
+                cache: "no-store",
+                headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+            });
+            const d = await r.json();
+            if (d.success) {
+                setCombinedDays(d.data?.days || []);
+                setCombinedTargets(d.data?.weekly_targets || null);
+                setWellnessNote(d.data?.wellness_note || "");
+                setCombinedMode((d.data?.mode || mode) as "balanced" | "exam_week" | "light_workout" | "revision_priority");
+            } else {
+                setCombinedDays([]);
+                setCombinedTargets(null);
+            }
+        } catch {
+            setCombinedDays([]);
+            setCombinedTargets(null);
+        } finally {
+            setCombinedPlanLoading(false);
+        }
+    };
+
+    const logWorkout = async (block: CombinedBlock) => {
+        if (!admNo || !block.duration_minutes) return;
+        try {
+            const r = await fetch(`${API_BASE}/api/planner/log-workout-session`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    student_id: admNo,
+                    duration_minutes: block.duration_minutes,
+                    workout_type: block.type || "home_workout",
+                    intensity: block.intensity || "moderate",
+                    completed: true,
+                }),
+            });
+            const d = await r.json();
+            if (d.success) {
+                const c = await fetch(`${API_BASE}/api/planner/workout-compliance/${admNo}`);
+                const cd = await c.json();
+                if (cd.success) {
+                    setCompliance({
+                        study_compliance: cd.data.study_compliance ?? 0,
+                        workout_compliance: cd.data.workout_compliance ?? 0,
+                        balanced_routine_score: cd.data.balanced_routine_score ?? 0,
+                    });
+                }
+            }
+        } catch {
+            // silent
+        }
     };
 
     const srcInfo = SOURCE_LABELS[source] || SOURCE_LABELS["rule-based"];
@@ -222,6 +322,14 @@ export default function StudentInsightsPage() {
                                 >
                                     {planLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
                                     Generate Study Plan
+                                </Button>
+                                <Button
+                                    onClick={() => genCombinedPlan(combinedMode)}
+                                    disabled={combinedPlanLoading}
+                                    className="bg-emerald-400 text-emerald-950 hover:bg-emerald-300 font-bold gap-2 shadow-xl"
+                                >
+                                    {combinedPlanLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Dumbbell className="h-4 w-4" />}
+                                    Study + Workout Plan
                                 </Button>
                             </div>
                         </div>
@@ -386,6 +494,111 @@ export default function StudentInsightsPage() {
                                             <ReactMarkdown>{plan}</ReactMarkdown>
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* ══════════ COMBINED STUDY + WORKOUT PLAN ═════════ */}
+                <AnimatePresence>
+                    {combinedPlanOpen && (
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                            <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 to-cyan-500/5 overflow-hidden">
+                                <div className="flex flex-col gap-3 p-5 border-b border-emerald-500/10">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-9 w-9 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                                                <Dumbbell className="h-5 w-5 text-emerald-400" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-sm">Study + Home Workout Schedule</h3>
+                                                {combinedTargets && (
+                                                    <p className="text-[11px] text-muted-foreground">
+                                                        Target: {combinedTargets.study_hours_target}h study · {combinedTargets.workout_sessions_target} workouts
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-lg" onClick={() => setCombinedPlanOpen(false)}>
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {[
+                                            { key: "balanced", label: "Balanced" },
+                                            { key: "exam_week", label: "Exam week mode" },
+                                            { key: "light_workout", label: "Light workout mode" },
+                                            { key: "revision_priority", label: "Revision priority mode" },
+                                        ].map((m) => (
+                                            <Button
+                                                key={m.key}
+                                                size="sm"
+                                                variant={combinedMode === m.key ? "default" : "outline"}
+                                                className={combinedMode === m.key ? "bg-emerald-600 hover:bg-emerald-500" : ""}
+                                                onClick={() => {
+                                                    const mode = m.key as "balanced" | "exam_week" | "light_workout" | "revision_priority";
+                                                    setCombinedMode(mode);
+                                                    genCombinedPlan(mode);
+                                                }}
+                                            >
+                                                {m.label}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="p-5 space-y-4">
+                                    {compliance && (
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
+                                                <p className="text-[11px] text-muted-foreground">Study Compliance</p>
+                                                <p className="text-lg font-bold">{compliance.study_compliance}%</p>
+                                            </div>
+                                            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+                                                <p className="text-[11px] text-muted-foreground">Workout Consistency</p>
+                                                <p className="text-lg font-bold">{compliance.workout_compliance}%</p>
+                                            </div>
+                                            <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3">
+                                                <p className="text-[11px] text-muted-foreground">Balanced Routine Score</p>
+                                                <p className="text-lg font-bold">{compliance.balanced_routine_score}%</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {combinedPlanLoading ? (
+                                        <div className="flex items-center justify-center py-10 text-muted-foreground">
+                                            <Loader2 className="h-5 w-5 animate-spin mr-2" /> Generating combined schedule...
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-3">
+                                            {combinedDays.map((d) => (
+                                                <div key={`${d.day}-${d.date}`} className="rounded-xl border border-border/50 p-3">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <p className="font-semibold text-sm">{d.day} <span className="text-xs text-muted-foreground">({d.date})</span></p>
+                                                        {d.recovery_day && <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30">Recovery day</Badge>}
+                                                    </div>
+                                                    {d.class_hours?.length > 0 && (
+                                                        <p className="text-[11px] text-muted-foreground mb-2">Class hours: {d.class_hours.join(", ")}</p>
+                                                    )}
+                                                    <div className="space-y-2">
+                                                        {d.study_blocks.map((b, i) => (
+                                                            <div key={i} className="rounded-lg bg-indigo-500/10 border border-indigo-500/20 p-2 text-xs">
+                                                                📘 <span className="font-semibold">{b.time}</span> · {b.subject} ({b.duration_hours}h)
+                                                            </div>
+                                                        ))}
+                                                        {d.workout_blocks.map((b, i) => (
+                                                            <div key={`w-${i}`} className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-2 text-xs flex items-center justify-between gap-2">
+                                                                <span>🏃 <span className="font-semibold">{b.time}</span> · {b.goal} ({b.duration_minutes} mins, {b.intensity})</span>
+                                                                <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => logWorkout(b)}>
+                                                                    Mark done
+                                                                </Button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {wellnessNote && <p className="text-[11px] text-muted-foreground">{wellnessNote}</p>}
                                 </div>
                             </div>
                         </motion.div>
