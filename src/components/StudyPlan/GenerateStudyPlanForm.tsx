@@ -35,8 +35,8 @@ function getTodayStr(): string {
 
 function getDefaultEndStr(): string {
   const d = new Date();
-  d.setMonth(d.getMonth() + 4);
-  return d.toISOString().split("T")[0];
+  const end = new Date(d.getFullYear(), d.getMonth() + 4, d.getDate());
+  return end.toISOString().split("T")[0];
 }
 
 export function GenerateStudyPlanForm({ studentId, onSuccess }: Props) {

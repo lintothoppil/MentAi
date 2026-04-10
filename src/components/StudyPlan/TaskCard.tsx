@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import type { DailyTask, TaskPriority, TaskStatus } from "@/lib/studyPlanTypes";
-import { cn } from "@/lib/utils";
+import { cn, formatMinutes } from "@/lib/utils";
 
 interface TaskCardProps {
   task: DailyTask;
@@ -42,15 +42,6 @@ export function TaskCard({ task, onProgressUpdate, readOnly = false }: TaskCardP
   const handleSave = () => {
     onProgressUpdate?.(task.id, progress, actualMin, notes);
     setEditing(false);
-  };
-
-  const formatMinutes = (min: number) => {
-    if (min === 0) return "0 min";
-    const h = Math.floor(min / 60);
-    const m = min % 60;
-    if (h > 0 && m > 0) return `${h}h ${m}m`;
-    if (h > 0) return `${h}h`;
-    return `${m}m`;
   };
 
   return (

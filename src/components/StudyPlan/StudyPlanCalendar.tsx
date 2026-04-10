@@ -19,18 +19,27 @@ const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function isoToDisplayDate(iso: string) {
   // Parse date parts explicitly to avoid UTC-vs-local timezone ambiguity
-  const [year, month, day] = iso.split("-").map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
+  try {
+    const [year, month, day] = iso.split("-").map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return iso;
+  }
 }
 
 function getDayIndex(isoDate: string) {
   // Parse date parts explicitly to avoid UTC midnight shifting to previous day
-  const [year, month, day] = isoDate.split("-").map(Number);
-  const d = new Date(year, month - 1, day);
-  return (d.getDay() + 6) % 7; // Mon=0 … Sun=6
+  try {
+    const [year, month, day] = isoDate.split("-").map(Number);
+    const d = new Date(year, month - 1, day);
+    if (isNaN(d.getTime())) return 0;
+    return (d.getDay() + 6) % 7; // Mon=0 … Sun=6
+  } catch {
+    return 0;
+  }
 }
 
 export function StudyPlanCalendar({ weeklyPlans, allTasks }: Props) {

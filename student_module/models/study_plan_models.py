@@ -218,6 +218,9 @@ class WeeklyPlan(db.Model):
         if not tasks:
             self.completion_percentage = 0.0
             return
+        # Skipped tasks count against the completion percentage (they are
+        # not completed), but they are intentional so mentors can distinguish
+        # low-completion-due-to-skipping from low-completion-due-to-pending.
         done = sum(1 for t in tasks if t.status == TaskStatus.COMPLETED)
         self.completion_percentage = round((done / len(tasks)) * 100, 2)
 

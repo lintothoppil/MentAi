@@ -126,6 +126,8 @@ class StudyPlanGenerationService:
         enriched = self._enrich_subjects(subjects, academic_history or [])
 
         # Compute per-subject hour allocations for the whole plan
+        # We use ceil to ensure the final partial week is included (e.g. 13-day
+        # plan → 2 weeks so the last 6 days get their own weekly plan).
         total_weeks = max(1, math.ceil((end_date - start_date).days / 7))
         subject_weights = self._compute_subject_weights(enriched, stress_level)
         subject_hours_per_week = self._allocate_hours(
@@ -399,7 +401,11 @@ class StudyPlanGenerationService:
             )
             scores = perf_map.get(name.lower(), [])
             avg_score = sum(scores) / len(scores) if scores else 65.0
-            # Students with lower scores need more time
+            # performance_factor = 1 - (score - 50) / 100, clamped to [0, 1]
+            # Score 50  → factor 1.0 (baseline, normal allocation)
+            # Score < 50 → factor > 1.0 (clamped to 1.0; student needs more help)
+            # Score 100 → factor 0.5 (proficient student, less remedial time)
+            # Expected score range: 0–100
             performance_factor = _clamp(1.0 - (avg_score - 50) / 100)
 
             enriched.append(

@@ -43,8 +43,12 @@ def require_auth(f):
 
 
 def _get_current_student_id() -> int | None:
-    """Return student id from the request context (override as needed)."""
-    return getattr(g, "student_id", None) or request.args.get("student_id", type=int)
+    """
+    Return student id from the authenticated session context only.
+    Never derive identity from user-supplied query parameters.
+    Replace with `current_user.student_id` when Flask-Login is wired up.
+    """
+    return getattr(g, "student_id", None)
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +106,8 @@ def generate_plan():
         )
         return jsonify(plan.to_dict(include_weeks=True)), 201
     except StudyPlanValidationError:
+        # Use a generic message to avoid leaking internal details;
+        # specific validation errors are logged by the service layer.
         return _json_error("Invalid plan parameters. Check dates and subjects.")
     except SQLAlchemyError as exc:
         logger.exception("DB error generating plan: %s", exc)
