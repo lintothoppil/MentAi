@@ -4055,6 +4055,10 @@ def _normalize_batch_label(batch: str) -> str:
     )
 
 
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def _build_student_context(admission_number: str) -> dict:
     """Gather all student metrics and return a structured context dict."""
     student = Student.query.get(admission_number)
@@ -4104,7 +4108,7 @@ def _build_student_context(admission_number: str) -> dict:
                 done += sum((log.hours_completed or 0) for log in s.sessions)
         ctx["study_plan_compliance"] = round((done / total * 100) if total else 0, 1)
         ctx["study_plan_subjects"] = [
-            (s.subject.name if s.subject and s.subject.name else f"Subject {s.subject_id}")
+            (s.subject.name if s.subject and s.subject.name else "Unknown Subject")
             for s in plan.subjects
         ]
 
@@ -4112,11 +4116,11 @@ def _build_student_context(admission_number: str) -> dict:
     timetable_entries = []
     timetable_by_day = {}
     if student.branch and student.batch:
-        dept = student.branch
-        base_batch = _normalize_batch_label(student.batch)
-        q = Timetable.query.filter(Timetable.department.ilike(f"%{dept}%"))
+        dept = _escape_like(student.branch)
+        base_batch = _escape_like(_normalize_batch_label(student.batch))
+        q = Timetable.query.filter(Timetable.department.ilike(f"%{dept}%", escape="\\"))
         if base_batch:
-            q = q.filter(Timetable.batch.ilike(f"%{base_batch}%"))
+            q = q.filter(Timetable.batch.ilike(f"%{base_batch}%", escape="\\"))
         timetable_entries = q.order_by(Timetable.day, Timetable.period).all()
 
     for t in timetable_entries:
@@ -4421,7 +4425,7 @@ def _fallback_study_plan(ctx: dict) -> str:
         secondary = subs[(i + 1) % len(subs)] if len(subs) > 1 else primary
         day_targets[day] = (primary, secondary)
 
-    timetable_by_day = ctx.get("timetable_by_day", {}) or {}
+    timetable_by_day = ctx.get("timetable_by_day", {})
     plan_lines = [f"## 📅 Weekly Study Plan for {name}\n"]
     for day, (p, s) in day_targets.items():
         class_slots = timetable_by_day.get(day, [])
