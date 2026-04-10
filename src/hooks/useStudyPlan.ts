@@ -26,8 +26,13 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+    const contentType = res.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+    }
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `HTTP ${res.status}`);
   }
   return res.json() as Promise<T>;
 }

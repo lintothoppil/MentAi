@@ -5,6 +5,7 @@
  */
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { PlanStatus, StudyPlan } from "@/lib/studyPlanTypes";
 import { useStudentPlans } from "@/hooks/useStudyPlan";
 import { cn } from "@/lib/utils";
@@ -105,6 +106,7 @@ function PlanCard({ plan, onView }: PlanCardProps) {
 export function StudyPlanHistoryPage() {
   const { data: plans, isLoading, isError } = useStudentPlans(DEMO_STUDENT_ID);
   const [filterStatus, setFilterStatus] = useState<PlanStatus | "all">("all");
+  const navigate = useNavigate();
 
   const filtered =
     filterStatus === "all"
@@ -112,8 +114,7 @@ export function StudyPlanHistoryPage() {
       : (plans ?? []).filter((p) => p.status === filterStatus);
 
   const handleView = (planId: number) => {
-    // In a full app, navigate to /study-plans/:id
-    window.location.href = `/study-plans?plan=${planId}`;
+    navigate(`/?plan=${planId}`);
   };
 
   return (

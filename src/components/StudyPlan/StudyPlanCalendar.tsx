@@ -18,14 +18,18 @@ interface Props {
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function isoToDisplayDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
+  // Parse date parts explicitly to avoid UTC-vs-local timezone ambiguity
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
   });
 }
 
 function getDayIndex(isoDate: string) {
-  const d = new Date(isoDate);
+  // Parse date parts explicitly to avoid UTC midnight shifting to previous day
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const d = new Date(year, month - 1, day);
   return (d.getDay() + 6) % 7; // Mon=0 … Sun=6
 }
 

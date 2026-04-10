@@ -45,9 +45,12 @@ export function TaskCard({ task, onProgressUpdate, readOnly = false }: TaskCardP
   };
 
   const formatMinutes = (min: number) => {
+    if (min === 0) return "0 min";
     const h = Math.floor(min / 60);
     const m = min % 60;
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    if (h > 0 && m > 0) return `${h}h ${m}m`;
+    if (h > 0) return `${h}h`;
+    return `${m}m`;
   };
 
   return (

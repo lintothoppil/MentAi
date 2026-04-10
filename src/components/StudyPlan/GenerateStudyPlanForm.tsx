@@ -29,10 +29,15 @@ const PRESET_SUBJECTS = [
   "English",
 ];
 
-const todayStr = new Date().toISOString().split("T")[0];
-const fourMonthsLater = new Date();
-fourMonthsLater.setMonth(fourMonthsLater.getMonth() + 4);
-const defaultEndStr = fourMonthsLater.toISOString().split("T")[0];
+function getTodayStr(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+function getDefaultEndStr(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 4);
+  return d.toISOString().split("T")[0];
+}
 
 export function GenerateStudyPlanForm({ studentId, onSuccess }: Props) {
   const generateMutation = useGeneratePlan();
@@ -40,8 +45,8 @@ export function GenerateStudyPlanForm({ studentId, onSuccess }: Props) {
   // Form state
   const [title, setTitle] = useState("My Semester Study Plan");
   const [description, setDescription] = useState("");
-  const [startDate, setStartDate] = useState(todayStr);
-  const [endDate, setEndDate] = useState(defaultEndStr);
+  const [startDate, setStartDate] = useState(getTodayStr);
+  const [endDate, setEndDate] = useState(getDefaultEndStr);
   const [weeklyHours, setWeeklyHours] = useState(20);
   const [stressLevel, setStressLevel] = useState(5);
   const [subjects, setSubjects] = useState<SubjectInput[]>([

@@ -85,18 +85,24 @@ def generate_plan():
     if missing:
         return _json_error(f"Missing required fields: {', '.join(missing)}")
 
-    academic_history = data.pop("academic_history", [])
-    student_id = data.pop("student_id")
+    # Extract without mutating the original dict
+    academic_history = data.get("academic_history", [])
+    student_id = data.get("student_id")
+    plan_params = {
+        k: v
+        for k, v in data.items()
+        if k not in ("student_id", "academic_history")
+    }
 
     try:
         plan = _service.generate_plan(
             student_id=student_id,
-            params=data,
+            params=plan_params,
             academic_history=academic_history,
         )
         return jsonify(plan.to_dict(include_weeks=True)), 201
-    except StudyPlanValidationError as exc:
-        return _json_error(str(exc))
+    except StudyPlanValidationError:
+        return _json_error("Invalid plan parameters. Check dates and subjects.")
     except SQLAlchemyError as exc:
         logger.exception("DB error generating plan: %s", exc)
         db.session.rollback()
@@ -110,7 +116,7 @@ def get_plan(plan_id: int):
     include_weeks = request.args.get("include_weeks", "false").lower() == "true"
     plan = _service.get_plan(plan_id)
     if plan is None:
-        return _json_error(f"Plan {plan_id} not found", 404)
+        return _json_error("Study plan not found", 404)
     return jsonify(plan.to_dict(include_weeks=include_weeks))
 
 
@@ -131,7 +137,7 @@ def get_weekly_plans(plan_id: int):
     if not weeks:
         plan = _service.get_plan(plan_id)
         if plan is None:
-            return _json_error(f"Plan {plan_id} not found", 404)
+            return _json_error("Study plan not found", 404)
     return jsonify([w.to_dict(include_tasks=include_tasks) for w in weeks])
 
 
@@ -170,8 +176,8 @@ def update_task_progress(task_id: int):
             notes=data.get("notes"),
         )
         return jsonify(task.to_dict())
-    except StudyPlanValidationError as exc:
-        return _json_error(str(exc), 404)
+    except StudyPlanValidationError:
+        return _json_error("Task not found", 404)
     except SQLAlchemyError as exc:
         logger.exception("DB error updating task %s: %s", task_id, exc)
         db.session.rollback()
@@ -185,8 +191,8 @@ def adapt_plan(plan_id: int):
     try:
         plan = _service.adapt_plan(plan_id)
         return jsonify(plan.to_dict(include_weeks=True))
-    except StudyPlanValidationError as exc:
-        return _json_error(str(exc), 404)
+    except StudyPlanValidationError:
+        return _json_error("Study plan not found", 404)
     except SQLAlchemyError as exc:
         logger.exception("DB error adapting plan %s: %s", plan_id, exc)
         db.session.rollback()
@@ -200,8 +206,8 @@ def get_plan_stats(plan_id: int):
     try:
         stats = _service.get_plan_stats(plan_id)
         return jsonify(stats)
-    except StudyPlanValidationError as exc:
-        return _json_error(str(exc), 404)
+    except StudyPlanValidationError:
+        return _json_error("Study plan not found", 404)
 
 
 @study_plan_bp.route("/templates", methods=["GET"])

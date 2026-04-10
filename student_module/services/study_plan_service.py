@@ -11,6 +11,7 @@ Adaptive algorithm for generating personalized study plans based on:
 """
 
 import logging
+import math
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
@@ -125,7 +126,7 @@ class StudyPlanGenerationService:
         enriched = self._enrich_subjects(subjects, academic_history or [])
 
         # Compute per-subject hour allocations for the whole plan
-        total_weeks = max(1, (end_date - start_date).days // 7)
+        total_weeks = max(1, math.ceil((end_date - start_date).days / 7))
         subject_weights = self._compute_subject_weights(enriched, stress_level)
         subject_hours_per_week = self._allocate_hours(
             subject_weights, weekly_hours
@@ -593,7 +594,12 @@ class StudyPlanGenerationService:
                 "into shorter 25-minute Pomodoro intervals with regular breaks."
             )
 
-        top_subject = max(allocation, key=allocation.get) if allocation else None
+        # Use sorted() for a deterministic result when multiple subjects share the max
+        top_subject = (
+            sorted(allocation, key=lambda k: (-allocation[k], k))[0]
+            if allocation
+            else None
+        )
 
         return {
             "weak_subjects": weak_subjects,
