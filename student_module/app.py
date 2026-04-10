@@ -4358,15 +4358,22 @@ def _fallback_chat(message: str, ctx: dict) -> str:
 @app.route('/api/ai/study-plan/<string:admission_number>', methods=['GET'])
 def api_ai_study_plan(admission_number):
     """Generate a detailed weekly study plan using OpenAI."""
+    def _json_no_cache(payload, status=200):
+        response = jsonify(payload)
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response, status
+
     ctx    = _build_student_context(admission_number)
     client = _get_openai_client()
 
     if not ctx:
-        return jsonify({'success': False, 'message': 'Student not found'}), 404
+        return _json_no_cache({'success': False, 'message': 'Student not found'}, 404)
 
     if not client:
         plan = _fallback_study_plan(ctx)
-        return jsonify({'success': True, 'plan': plan, 'source': 'rule-based'}), 200
+        return _json_no_cache({'success': True, 'plan': plan, 'source': 'rule-based'}, 200)
 
     try:
         marks_dict  = ctx.get('subject_marks', {})
@@ -4405,10 +4412,10 @@ Keep it motivating and actionable."""
             temperature=0.7,
         )
         plan = resp.choices[0].message.content
-        return jsonify({'success': True, 'plan': plan, 'source': 'openai'}), 200
+        return _json_no_cache({'success': True, 'plan': plan, 'source': 'openai'}, 200)
     except Exception as e:
         plan = _fallback_study_plan(ctx)
-        return jsonify({'success': True, 'plan': plan, 'source': 'rule-based', 'note': str(e)}), 200
+        return _json_no_cache({'success': True, 'plan': plan, 'source': 'rule-based', 'note': str(e)}, 200)
 
 
 def _fallback_study_plan(ctx: dict) -> str:

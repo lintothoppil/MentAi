@@ -134,10 +134,20 @@ export default function StudentInsightsPage() {
         setPlanOpen(true);
         setPlan("");
         try {
-            const r = await fetch(`http://localhost:5000/api/ai/study-plan/${admNo}`);
+            const r = await fetch(`http://localhost:5000/api/ai/study-plan/${admNo}?_ts=${Date.now()}`, {
+                cache: "no-store",
+                headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+            });
             const d = await r.json();
-            if (d.success) { setPlan(d.plan); setPlanSource(d.source); }
-        } catch { setPlan("Failed to generate. Please try again."); }
+            if (d.success) {
+                setPlan(d.plan);
+                setPlanSource(d.source);
+            } else {
+                setPlan(d.message || "Failed to generate. Please try again.");
+            }
+        } catch {
+            setPlan("Failed to generate. Please try again.");
+        }
         finally { setPlanLoading(false); }
     };
 
