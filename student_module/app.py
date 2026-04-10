@@ -686,7 +686,8 @@ def api_register():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        app.logger.exception("Workout session log failed for %s", data.get('student_id') if 'data' in locals() else 'unknown')
+        return jsonify({'success': False, 'message': 'Unable to log workout session right now'}), 500
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -1088,8 +1089,9 @@ def api_get_teachers():
             
         return jsonify({'success': True, 'data': data}), 200
 
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+    except Exception:
+        app.logger.exception("Workout compliance fetch failed for %s", student_id)
+        return jsonify({'success': False, 'message': 'Unable to fetch workout compliance right now'}), 500
 
 @app.route('/api/admin/faculty/<int:faculty_id>/status', methods=['PUT'])
 def api_update_faculty_status(faculty_id):
@@ -1144,8 +1146,9 @@ def api_get_students_list():
                 'mentor_id': s.mentor_id
             })
         return jsonify({'success': True, 'data': data}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+    except Exception:
+        app.logger.exception("Combined plan generation failed for %s", admission_number)
+        return jsonify({'success': False, 'message': 'Unable to generate combined plan right now'}), 500
 
 @app.route('/api/admin/student/<string:admission_number>/status', methods=['PUT'])
 def api_update_student_status(admission_number):
@@ -4609,14 +4612,17 @@ Keep it motivating and actionable. Add one sentence that this is general wellnes
     except Exception:
         app.logger.exception("AI study-plan generation failed for %s", admission_number)
         plan = _fallback_study_plan(ctx)
-        return _json_no_cache({'success': True, 'plan': plan, 'source': 'rule-based'}, 200)
+        return _json_no_cache({'success': True, 'plan': plan, 'source': 'rule-based', 'note': 'AI provider unavailable; generated fallback plan.'}, 200)
 
 
 def _fallback_study_plan(ctx: dict) -> str:
     marks_dict = ctx.get('subject_marks', {})
     name = ctx.get('name', 'Student')
     wp = ctx.get('wellness_preferences', {})
-    workout_duration = int(wp.get('workout_duration_minutes', 30) or 30)
+    try:
+        workout_duration = int(wp.get('workout_duration_minutes', 30))
+    except (TypeError, ValueError):
+        workout_duration = 30
     preferred_slot = wp.get('preferred_workout_time', 'evening')
     workout_label = "🏃 Home Workout"
     if preferred_slot == "morning":
@@ -4679,6 +4685,9 @@ def _fallback_study_plan(ctx: dict) -> str:
     return "\n".join(plan_lines)
 
 
+RECOVERY_DURATION_REDUCTION = 10
+
+
 def _build_combined_study_workout_schedule(ctx: dict, mode: str = "balanced") -> dict:
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     today = datetime.utcnow().date()
@@ -4688,8 +4697,14 @@ def _build_combined_study_workout_schedule(ctx: dict, mode: str = "balanced") ->
     wp = ctx.get("wellness_preferences", {})
     wake_time = wp.get("wake_time", "06:00")
     sleep_time = wp.get("sleep_time", "22:30")
-    workout_duration = int(wp.get("workout_duration_minutes", 30) or 30)
-    weekly_workout_target = int(wp.get("weekly_workout_target", 4) or 4)
+    try:
+        workout_duration = int(wp.get("workout_duration_minutes", 30))
+    except (TypeError, ValueError):
+        workout_duration = 30
+    try:
+        weekly_workout_target = int(wp.get("weekly_workout_target", 4))
+    except (TypeError, ValueError):
+        weekly_workout_target = 4
     preferred_workout_time = wp.get("preferred_workout_time", "evening")
     fitness_goal = wp.get("fitness_goal", "general_fitness")
     intensity = wp.get("intensity_level", "moderate")
@@ -4700,7 +4715,7 @@ def _build_combined_study_workout_schedule(ctx: dict, mode: str = "balanced") ->
         workout_duration = max(15, min(25, workout_duration))
     elif mode == "light_workout":
         study_hours_per_day = 3.0
-        workout_duration = max(15, workout_duration - 10)
+        workout_duration = max(15, workout_duration - RECOVERY_DURATION_REDUCTION)
     elif mode == "revision_priority":
         study_hours_per_day = 3.8
     else:
@@ -4757,7 +4772,7 @@ def _build_combined_study_workout_schedule(ctx: dict, mode: str = "balanced") ->
                 workout_time = "20:15-20:45"
 
             block_intensity = "light" if is_recovery_day else intensity
-            block_duration = max(15, workout_duration - 10) if is_recovery_day else workout_duration
+            block_duration = max(15, workout_duration - RECOVERY_DURATION_REDUCTION) if is_recovery_day else workout_duration
             workout_blocks.append({
                 "time": workout_time,
                 "type": "home_workout",

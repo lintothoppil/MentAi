@@ -102,6 +102,7 @@ export default function StudentInsightsPage() {
     const [combinedDays, setCombinedDays] = useState<CombinedDayPlan[]>([]);
     const [combinedTargets, setCombinedTargets] = useState<{ study_hours_target: number; workout_sessions_target: number } | null>(null);
     const [wellnessNote, setWellnessNote] = useState("");
+    const [workoutLogError, setWorkoutLogError] = useState("");
     const [compliance, setCompliance] = useState<{ study_compliance: number; workout_compliance: number; balanced_routine_score: number } | null>(null);
     const [expandCard, setExpandCard]     = useState<number | null>(null);
     const chatEnd = useRef<HTMLDivElement>(null);
@@ -132,7 +133,13 @@ export default function StudentInsightsPage() {
                     });
                 }
             })
-            .catch(() => {});
+            .catch(() => {
+                setCompliance({
+                    study_compliance: 0,
+                    workout_compliance: 0,
+                    balanced_routine_score: 0,
+                });
+            });
     }, [admNo]);
 
     // scroll chat
@@ -237,6 +244,7 @@ export default function StudentInsightsPage() {
             });
             const d = await r.json();
             if (d.success) {
+                setWorkoutLogError("");
                 const c = await fetch(`${API_BASE}/api/planner/workout-compliance/${admNo}`);
                 const cd = await c.json();
                 if (cd.success) {
@@ -248,7 +256,7 @@ export default function StudentInsightsPage() {
                 }
             }
         } catch {
-            // silent
+            setWorkoutLogError("Could not log workout right now. Please try again.");
         }
     };
 
@@ -598,6 +606,7 @@ export default function StudentInsightsPage() {
                                             ))}
                                         </div>
                                     )}
+                                    {workoutLogError && <p className="text-[11px] text-red-400">{workoutLogError}</p>}
                                     {wellnessNote && <p className="text-[11px] text-muted-foreground">{wellnessNote}</p>}
                                 </div>
                             </div>
