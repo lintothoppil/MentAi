@@ -4413,9 +4413,10 @@ Keep it motivating and actionable."""
         )
         plan = resp.choices[0].message.content
         return _json_no_cache({'success': True, 'plan': plan, 'source': 'openai'}, 200)
-    except Exception as e:
+    except Exception:
+        app.logger.exception("AI study-plan generation failed for %s", admission_number)
         plan = _fallback_study_plan(ctx)
-        return _json_no_cache({'success': True, 'plan': plan, 'source': 'rule-based', 'note': str(e)}, 200)
+        return _json_no_cache({'success': True, 'plan': plan, 'source': 'rule-based'}, 200)
 
 
 def _fallback_study_plan(ctx: dict) -> str:
