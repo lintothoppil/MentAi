@@ -2748,6 +2748,15 @@ from analytics.planner import generate_and_lock_weekly_plan
 from models import WeeklyStudyPlan, StudyPlanSubject, StudySessionLog, MentorIntervention
 from datetime import date, timedelta
 
+PERSONALIZED_PLANNER_MAX_MINUTES_IN_DAY = 24 * 60
+PERSONALIZED_PLANNER_MAX_RECOMMENDATIONS = 4
+PERSONALIZED_PLANNER_STUDY_SLOTS = ["17:30", "19:00", "20:30"]
+PERSONALIZED_PLANNER_BATCH_PREFIXES = ("MCA ", "IMCA ", "MBA ")
+PERSONALIZED_PLANNER_MIN_REMAINING_HOURS = 0.5
+PERSONALIZED_PLANNER_HIGH_RISK_THRESHOLD = 60
+PERSONALIZED_PLANNER_MEDIUM_RISK_THRESHOLD = 35
+PERSONALIZED_PLANNER_TARGET_COMPLIANCE = 80
+
 @app.route('/api/planner/<string:student_id>', methods=['GET'])
 def api_get_student_planner(student_id):
     try:
@@ -2799,7 +2808,10 @@ def api_get_personalized_planner(student_id):
             return jsonify({'success': False, 'message': 'Could not generate plan'}), 400
 
         weekday = date.today().strftime("%A")
-        batch = (student.batch or "").replace('MCA ', '').replace('IMCA ', '').replace('MBA ', '').strip()
+        batch = (student.batch or "")
+        for prefix in PERSONALIZED_PLANNER_BATCH_PREFIXES:
+            batch = batch.replace(prefix, "")
+        batch = batch.strip()
         department = (student.branch or "").strip()
         query = Timetable.query
         if department:
@@ -2818,16 +2830,15 @@ def api_get_personalized_planner(student_id):
 
         prioritized_subjects = sorted(
             plan.subjects,
-            key=lambda s: (0 if s.priority == "Critical" else 1 if s.priority == "Moderate" else 2, -s.weakness_score)
+            key=lambda s: (0 if s.priority == "Critical" else 1 if s.priority == "Moderate" else 2, -(s.weakness_score or 0))
         )
 
-        study_slots = ["17:30", "19:00", "20:30"]
         for idx, sub in enumerate(prioritized_subjects[:3]):
             completed = sum(log.hours_completed for log in sub.sessions)
-            remaining = max(0.5, round(sub.allocated_hours - completed, 1))
+            remaining = max(PERSONALIZED_PLANNER_MIN_REMAINING_HOURS, round(sub.allocated_hours - completed, 1))
             schedule.append({
-                "time": study_slots[idx] if idx < len(study_slots) else "21:00",
-                "label": f"{sub.subject.name if sub.subject else 'Study'} — {remaining}h target",
+                "time": PERSONALIZED_PLANNER_STUDY_SLOTS[idx] if idx < len(PERSONALIZED_PLANNER_STUDY_SLOTS) else "21:00",
+                "label": f"{sub.subject.name if sub.subject else 'Study'} - {remaining}h target",
                 "type": "study"
             })
 
@@ -2843,7 +2854,7 @@ def api_get_personalized_planner(student_id):
             digits = "".join(ch for ch in head if ch.isdigit())
             if digits:
                 return int(digits) * 60
-            return 24 * 60
+            return PERSONALIZED_PLANNER_MAX_MINUTES_IN_DAY
 
         schedule = sorted(schedule, key=_slot_sort_key)
 
@@ -2852,12 +2863,15 @@ def api_get_personalized_planner(student_id):
         compliance = round((completed_total / allocated_total) * 100, 1) if allocated_total > 0 else 0.0
 
         analytics = StudentAnalytics.query.filter_by(student_id=normalized_id).first()
-        avg_marks = round(analytics.avg_internal_marks, 1) if analytics else 0.0
-        attendance = round(analytics.attendance_percentage, 1) if analytics else 0.0
-        risk_score = round(analytics.risk_score, 1) if analytics else 0.0
+        avg_marks = round(analytics.avg_internal_marks, 1) if analytics and analytics.avg_internal_marks is not None else 0.0
+        attendance = round(analytics.attendance_percentage, 1) if analytics and analytics.attendance_percentage is not None else 0.0
+        risk_score = round(analytics.risk_score, 1) if analytics and analytics.risk_score is not None else 0.0
 
         weakest = prioritized_subjects[0] if prioritized_subjects else None
-        strongest = sorted(plan.subjects, key=lambda s: s.weakness_score)[0] if plan.subjects else None
+        strongest = sorted(
+            plan.subjects,
+            key=lambda s: ((s.weakness_score or 0), -(s.allocated_hours or 0), (s.subject.name if s.subject else ""))
+        )[0] if plan.subjects else None
 
         recommendations = []
         if weakest:
@@ -2865,12 +2879,12 @@ def api_get_personalized_planner(student_id):
                 "text": f"Primary focus today: {weakest.subject.name if weakest.subject else 'weakest subject'} ({weakest.priority} priority).",
                 "priority": "high"
             })
-        if risk_score > 60:
+        if risk_score > PERSONALIZED_PLANNER_HIGH_RISK_THRESHOLD:
             recommendations.append({
                 "text": f"Risk score is {risk_score}/100. Add one extra revision block and schedule a mentor check-in this week.",
                 "priority": "high"
             })
-        elif risk_score > 35:
+        elif risk_score > PERSONALIZED_PLANNER_MEDIUM_RISK_THRESHOLD:
             recommendations.append({
                 "text": f"Risk score is {risk_score}/100. Stay consistent with your timetable and finish planned sessions daily.",
                 "priority": "medium"
@@ -2882,7 +2896,7 @@ def api_get_personalized_planner(student_id):
             })
 
         recommendations.append({
-            "text": f"Current weekly plan compliance is {compliance}%. Target at least 80% by Sunday.",
+            "text": f"Current weekly plan compliance is {compliance}%. Target at least {PERSONALIZED_PLANNER_TARGET_COMPLIANCE}% by Sunday.",
             "priority": "normal" if compliance >= 50 else "medium"
         })
         recommendations.append({
@@ -2900,15 +2914,14 @@ def api_get_personalized_planner(student_id):
             'data': {
                 'day': weekday,
                 'schedule': schedule,
-                'recommendations': recommendations[:4],
+                'recommendations': recommendations[:PERSONALIZED_PLANNER_MAX_RECOMMENDATIONS],
                 'compliance': compliance,
                 'risk_score': risk_score
             }
         }), 200
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        app.logger.exception("Failed to generate personalized planner for %s", student_id)
+        return jsonify({'success': False, 'message': 'Failed to generate personalized planner'}), 500
 
 @app.route('/api/planner/log-session', methods=['POST'])
 def api_log_session():

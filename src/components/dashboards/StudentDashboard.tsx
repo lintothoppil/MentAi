@@ -56,6 +56,8 @@ const defaultSchedule = [
     { time: "17:30", label: "Sports / ECA", type: "activity" },
 ];
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
 const anim = (i: number) => ({
     initial: { opacity: 0, y: 16 },
     animate: { opacity: 1, y: 0 },
@@ -133,7 +135,7 @@ const StudentDashboard = () => {
 
     useEffect(() => {
         if (!user.admission_number) return;
-        fetch(`http://localhost:5000/api/planner/personalized/${user.admission_number}`)
+        fetch(`${API_BASE_URL}/api/planner/personalized/${user.admission_number}`)
             .then(res => res.json())
             .then(data => {
                 if (data.success && data.data) {
