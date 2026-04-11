@@ -40,6 +40,22 @@ const marksData = [
     { subject: "Networks", sem1: 75, sem2: 80 },
 ];
 
+const defaultRecommendations = [
+    { text: "Focus on DBMS — slight decline detected. Review normalization concepts.", priority: "high" },
+    { text: "Your ML scores improved 26% — keep practicing neural network problems.", priority: "positive" },
+    { text: "Daily goal: Complete 2 DSA problems and revise OS scheduling algorithms.", priority: "normal" },
+    { text: "Consider attending the remedial session for Networks on Friday.", priority: "medium" },
+];
+
+const defaultSchedule = [
+    { time: "09:00", label: "DSA Lecture", type: "class" },
+    { time: "11:00", label: "Study Block", type: "study" },
+    { time: "13:00", label: "Prayer Time", type: "personal" },
+    { time: "14:30", label: "ML Lab", type: "class" },
+    { time: "16:00", label: "Mentor Meeting", type: "meeting" },
+    { time: "17:30", label: "Sports / ECA", type: "activity" },
+];
+
 const anim = (i: number) => ({
     initial: { opacity: 0, y: 16 },
     animate: { opacity: 1, y: 0 },
@@ -95,6 +111,8 @@ const StudentDashboard = () => {
 
     const [planner, setPlanner] = useState<any>(null);
     const [logHours, setLogHours] = useState<{ [key: number]: string }>({});
+    const [recommendations, setRecommendations] = useState(defaultRecommendations);
+    const [todaySchedule, setTodaySchedule] = useState(defaultSchedule);
 
     const fetchPlanner = () => {
         if (user.admission_number) {
@@ -111,6 +129,23 @@ const StudentDashboard = () => {
 
     useEffect(() => {
         fetchPlanner();
+    }, [user.admission_number]);
+
+    useEffect(() => {
+        if (!user.admission_number) return;
+        fetch(`http://localhost:5000/api/planner/personalized/${user.admission_number}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.data) {
+                    if (Array.isArray(data.data.recommendations) && data.data.recommendations.length > 0) {
+                        setRecommendations(data.data.recommendations);
+                    }
+                    if (Array.isArray(data.data.schedule) && data.data.schedule.length > 0) {
+                        setTodaySchedule(data.data.schedule);
+                    }
+                }
+            })
+            .catch(err => console.error("Error fetching personalized planner:", err));
     }, [user.admission_number]);
 
     const handleLogSession = (subjectId: number) => {
@@ -420,10 +455,7 @@ const StudentDashboard = () => {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {[
-                                { text: "Focus on DBMS — slight decline detected. Review normalization concepts.", priority: "high" },
-                                { text: "Your ML scores improved 26% — keep practicing neural network problems.", priority: "positive" },
-                                { text: "Daily goal: Complete 2 DSA problems and revise OS scheduling algorithms.", priority: "normal" },
-                                { text: "Consider attending the remedial session for Networks on Friday.", priority: "medium" },
+                                ...recommendations
                             ].map((rec, i) => (
                                 <div key={i} className="flex items-start gap-4 rounded-xl border border-border/60 bg-muted/20 p-4 transition-all hover:bg-muted/40">
                                     <div className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full shadow-sm ${rec.priority === "high" ? "bg-destructive ring-2 ring-destructive/20" :
@@ -442,14 +474,7 @@ const StudentDashboard = () => {
                         <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Clock className="h-5 w-5" /> Today's Schedule</CardTitle></CardHeader>
                         <CardContent className="space-y-0 relative">
                             <div className="absolute left-[2.25rem] top-2 bottom-2 w-px bg-border z-0" />
-                            {[
-                                { time: "09:00", label: "DSA Lecture", type: "class" },
-                                { time: "11:00", label: "Study Block", type: "study" },
-                                { time: "13:00", label: "Prayer Time", type: "personal" },
-                                { time: "14:30", label: "ML Lab", type: "class" },
-                                { time: "16:00", label: "Mentor Meeting", type: "meeting" },
-                                { time: "17:30", label: "Sports / ECA", type: "activity" },
-                            ].map((slot, i) => (
+                            {todaySchedule.map((slot, i) => (
                                 <div key={i} className="flex items-center gap-3 py-3 relative z-10">
                                     <span className="w-14 text-xs font-semibold text-muted-foreground font-mono">{slot.time}</span>
                                     <div className={`h-4 w-4 rounded-full border-2 border-card shadow-sm ${slot.type === "class" ? "bg-student ring-2 ring-student/20" :

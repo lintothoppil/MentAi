@@ -2786,6 +2786,130 @@ def api_get_student_planner(student_id):
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@app.route('/api/planner/personalized/<string:student_id>', methods=['GET'])
+def api_get_personalized_planner(student_id):
+    try:
+        normalized_id = (student_id or "").upper()
+        student = Student.query.filter_by(admission_number=normalized_id).first()
+        if not student:
+            return jsonify({'success': False, 'message': 'Student not found'}), 404
+
+        plan = generate_and_lock_weekly_plan(normalized_id)
+        if not plan:
+            return jsonify({'success': False, 'message': 'Could not generate plan'}), 400
+
+        weekday = date.today().strftime("%A")
+        batch = (student.batch or "").replace('MCA ', '').replace('IMCA ', '').replace('MBA ', '').strip()
+        department = (student.branch or "").strip()
+        query = Timetable.query
+        if department:
+            query = query.filter(Timetable.department.ilike(f"%{department}%"))
+        if batch:
+            query = query.filter(Timetable.batch.ilike(f"%{batch}%"))
+        day_entries = query.filter(Timetable.day.ilike(weekday)).order_by(Timetable.period).all()
+
+        schedule = []
+        for entry in day_entries:
+            schedule.append({
+                "time": entry.time_slot or f"Period {entry.period}",
+                "label": f"{entry.subject or 'Class'} Lecture",
+                "type": "class"
+            })
+
+        prioritized_subjects = sorted(
+            plan.subjects,
+            key=lambda s: (0 if s.priority == "Critical" else 1 if s.priority == "Moderate" else 2, -s.weakness_score)
+        )
+
+        study_slots = ["17:30", "19:00", "20:30"]
+        for idx, sub in enumerate(prioritized_subjects[:3]):
+            completed = sum(log.hours_completed for log in sub.sessions)
+            remaining = max(0.5, round(sub.allocated_hours - completed, 1))
+            schedule.append({
+                "time": study_slots[idx] if idx < len(study_slots) else "21:00",
+                "label": f"{sub.subject.name if sub.subject else 'Study'} — {remaining}h target",
+                "type": "study"
+            })
+
+        def _slot_sort_key(slot):
+            ts = str(slot.get("time", "")).strip()
+            head = ts.split("-")[0].strip()
+            if ":" in head:
+                try:
+                    h, m = head.split(":")
+                    return int(h) * 60 + int(m)
+                except Exception:
+                    pass
+            digits = "".join(ch for ch in head if ch.isdigit())
+            if digits:
+                return int(digits) * 60
+            return 24 * 60
+
+        schedule = sorted(schedule, key=_slot_sort_key)
+
+        allocated_total = sum(sub.allocated_hours for sub in plan.subjects)
+        completed_total = sum(sum(log.hours_completed for log in sub.sessions) for sub in plan.subjects)
+        compliance = round((completed_total / allocated_total) * 100, 1) if allocated_total > 0 else 0.0
+
+        analytics = StudentAnalytics.query.filter_by(student_id=normalized_id).first()
+        avg_marks = round(analytics.avg_internal_marks, 1) if analytics else 0.0
+        attendance = round(analytics.attendance_percentage, 1) if analytics else 0.0
+        risk_score = round(analytics.risk_score, 1) if analytics else 0.0
+
+        weakest = prioritized_subjects[0] if prioritized_subjects else None
+        strongest = sorted(plan.subjects, key=lambda s: s.weakness_score)[0] if plan.subjects else None
+
+        recommendations = []
+        if weakest:
+            recommendations.append({
+                "text": f"Primary focus today: {weakest.subject.name if weakest.subject else 'weakest subject'} ({weakest.priority} priority).",
+                "priority": "high"
+            })
+        if risk_score > 60:
+            recommendations.append({
+                "text": f"Risk score is {risk_score}/100. Add one extra revision block and schedule a mentor check-in this week.",
+                "priority": "high"
+            })
+        elif risk_score > 35:
+            recommendations.append({
+                "text": f"Risk score is {risk_score}/100. Stay consistent with your timetable and finish planned sessions daily.",
+                "priority": "medium"
+            })
+        else:
+            recommendations.append({
+                "text": f"Risk score is {risk_score}/100. You are stable—maintain momentum with your current routine.",
+                "priority": "positive"
+            })
+
+        recommendations.append({
+            "text": f"Current weekly plan compliance is {compliance}%. Target at least 80% by Sunday.",
+            "priority": "normal" if compliance >= 50 else "medium"
+        })
+        recommendations.append({
+            "text": f"Attendance is {attendance}% and average internal mark is {avg_marks}/100. Protect attendance and revise after every class.",
+            "priority": "normal"
+        })
+        if strongest:
+            recommendations.append({
+                "text": f"Use confidence from {strongest.subject.name if strongest.subject else 'your strongest subject'} to accelerate difficult topics.",
+                "priority": "positive"
+            })
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'day': weekday,
+                'schedule': schedule,
+                'recommendations': recommendations[:4],
+                'compliance': compliance,
+                'risk_score': risk_score
+            }
+        }), 200
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @app.route('/api/planner/log-session', methods=['POST'])
 def api_log_session():
     try:
@@ -4770,4 +4894,3 @@ if __name__ == '__main__':
             print("Migration error:", e)
 
     app.run(debug=True, port=5000)
-
