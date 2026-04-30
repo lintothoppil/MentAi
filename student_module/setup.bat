@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo  MentorAI - Flask Backend Setup
+echo  MentAi - Flask Backend Setup
 echo ========================================
 echo.
 

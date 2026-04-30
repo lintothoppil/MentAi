@@ -265,6 +265,25 @@ class UniversityMark(db.Model):
         db.UniqueConstraint("student_id", "semester_id", name="unique_university_sem"),
     )
 
+class UniversityResult(db.Model):
+    __tablename__ = "university_results"
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.String(20), db.ForeignKey("students.admission_number"), nullable=False)
+    semester = db.Column(db.Integer, nullable=False)
+    subject = db.Column(db.String(150), nullable=False)
+    marks_obtained = db.Column(db.Float, nullable=False)
+    total_marks = db.Column(db.Float, nullable=False, default=100)
+    result_date = db.Column(db.Date)
+    status = db.Column(db.String(30), default="pending_verification")
+    verified_by_mentor_id = db.Column(db.Integer, db.ForeignKey("faculty.id"))
+    verified_at = db.Column(db.DateTime)
+    mentor_comment = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    student = db.relationship("Student", foreign_keys=[student_id], backref="university_results")
+    verified_by_mentor = db.relationship("Faculty", foreign_keys=[verified_by_mentor_id])
+
 class Attendance(db.Model):
     __tablename__ = 'attendance'
     id = db.Column(db.Integer, primary_key=True)
@@ -291,6 +310,8 @@ class MentoringSession(db.Model):
     # Google Calendar
     calendar_event_id = db.Column(db.String(255))
     calendar_link = db.Column(db.String(512))
+    attendance_marked_at = db.Column(db.DateTime)
+    absence_reason = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -623,6 +644,89 @@ class StudentMark(db.Model):
     internal3 = db.Column(db.Float)
     university_mark = db.Column(db.Float)
     semester = db.Column(db.Integer)
+    is_verified = db.Column(db.Boolean, default=False)
+
+class SubjectHandlerMark(db.Model):
+    __tablename__ = 'subject_handler_marks'
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.String(20), db.ForeignKey('students.admission_number'), nullable=False)
+    subject_code = db.Column(db.String(50), nullable=False)
+    exam_type = db.Column(db.String(30), nullable=False)  # Quiz / Assignment / MidSem
+    marks_obtained = db.Column(db.Float, nullable=False)
+    max_marks = db.Column(db.Float, nullable=False)
+    subject_handler_id = db.Column(db.Integer, db.ForeignKey('faculty.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    student = db.relationship('Student', foreign_keys=[student_id])
+    handler = db.relationship('Faculty', foreign_keys=[subject_handler_id])
+
+    __table_args__ = (
+        db.UniqueConstraint('student_id', 'subject_code', 'exam_type', name='uq_handler_mark_student_subject_exam'),
+    )
+
+class SubjectHandlerAttendance(db.Model):
+    __tablename__ = 'subject_handler_attendance'
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.String(20), db.ForeignKey('students.admission_number'), nullable=False)
+    subject_code = db.Column(db.String(50), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    status = db.Column(db.String(10), nullable=False)  # Present / Absent / Late
+    subject_handler_id = db.Column(db.Integer, db.ForeignKey('faculty.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    student = db.relationship('Student', foreign_keys=[student_id])
+    handler = db.relationship('Faculty', foreign_keys=[subject_handler_id])
+
+    __table_args__ = (
+        db.UniqueConstraint('student_id', 'subject_code', 'date', name='uq_handler_attendance_student_subject_date'),
+    )
+
+class SubjectAcademicEntry(db.Model):
+    __tablename__ = 'subject_academic_entries'
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.String(20), db.ForeignKey('students.admission_number'), nullable=False)
+    subject_code = db.Column(db.String(50), nullable=False)
+    internal_assessment_score = db.Column(db.Float)
+    assignment_submitted = db.Column(db.Boolean, default=False)
+    practical_lab_score = db.Column(db.Float)
+    subject_handler_id = db.Column(db.Integer, db.ForeignKey('faculty.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    student = db.relationship('Student', foreign_keys=[student_id])
+    handler = db.relationship('Faculty', foreign_keys=[subject_handler_id])
+
+    __table_args__ = (
+        db.UniqueConstraint('student_id', 'subject_code', name='uq_handler_academic_student_subject'),
+    )
+
+class SubjectDataAuditLog(db.Model):
+    __tablename__ = 'subject_data_audit_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    subject_handler_id = db.Column(db.Integer, db.ForeignKey('faculty.id'), nullable=False)
+    subject_code = db.Column(db.String(50), nullable=False)
+    action = db.Column(db.String(60), nullable=False)
+    entity = db.Column(db.String(60), nullable=False)
+    student_id = db.Column(db.String(20))
+    details = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    handler = db.relationship('Faculty', foreign_keys=[subject_handler_id])
+
+class SubjectAnalysisLog(db.Model):
+    __tablename__ = 'subject_analysis_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    subject_code = db.Column(db.String(50), nullable=False)
+    endpoint = db.Column(db.String(100), nullable=False)  # ai_ingest / risk_predict
+    payload = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Issue(db.Model):
     __tablename__ = 'issues'
@@ -644,10 +748,15 @@ class Certificate(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.String(20), db.ForeignKey('students.admission_number'), nullable=False)
+    title = db.Column(db.String(150))
+    issuing_org = db.Column(db.String(150))
+    issue_date = db.Column(db.Date)
+    expiry_date = db.Column(db.Date)
     activity_name = db.Column(db.String(150))
     category = db.Column(db.String(50))
     date_of_event = db.Column(db.Date)
     file_path = db.Column(db.String(255))
+    share_with_mentor = db.Column(db.Boolean, default=False)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class MentorMessage(db.Model):
@@ -660,4 +769,245 @@ class MentorMessage(db.Model):
     sender_role = db.Column(db.String(20)) # mentor or student
     sent_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_read = db.Column(db.Boolean, default=False)
+
+class SubjectHandlerMessage(db.Model):
+    __tablename__ = 'subject_handler_messages'
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.String(20), db.ForeignKey('students.admission_number'), nullable=False)
+    handler_id = db.Column(db.Integer, db.ForeignKey('faculty.id'), nullable=False)
+    subject = db.Column(db.String(150))
+    category = db.Column(db.String(50), default='Academic')
+    message = db.Column(db.Text, nullable=False)
+    attachment_path = db.Column(db.String(255))
+    sender_role = db.Column(db.String(20), nullable=False, default='student')  # student / handler
+    status = db.Column(db.String(20), default='open')  # open / replied / closed
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_read = db.Column(db.Boolean, default=False)
+
+    student = db.relationship('Student', foreign_keys=[student_id])
+    handler = db.relationship('Faculty', foreign_keys=[handler_id])
+
+class PlaygroundNote(db.Model):
+    __tablename__ = 'playground_notes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    subject_code = db.Column(db.String(50), nullable=False)
+    title = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text)
+    file_path = db.Column(db.String(255), nullable=False)
+    scope = db.Column(db.String(20), default='class')  # class / student
+    target_student_id = db.Column(db.String(20), db.ForeignKey('students.admission_number'))
+    department = db.Column(db.String(50))
+    batch = db.Column(db.String(20))
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey('faculty.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    target_student = db.relationship('Student', foreign_keys=[target_student_id])
+    uploader = db.relationship('Faculty', foreign_keys=[uploaded_by_id])
+
+class MentorPrivateNote(db.Model):
+    __tablename__ = 'mentor_private_notes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_admission_number = db.Column(db.String(20), db.ForeignKey('students.admission_number'), nullable=False)
+    mentor_id = db.Column(db.Integer, db.ForeignKey('faculty.id'), nullable=False)
+    session_id = db.Column(db.Integer, db.ForeignKey('mentoring_sessions.id'), nullable=True)
+    note_type = db.Column(db.String(20), default='private')  # private / session / abnormality
+    content = db.Column(db.Text, nullable=False)
+    visibility = db.Column(db.String(20), default='mentor_only')  # mentor_only / alumni_admin
+    transferred_to_admin = db.Column(db.Boolean, default=False)
+    transferred_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    student = db.relationship('Student', foreign_keys=[student_admission_number], backref='mentor_private_notes')
+    mentor = db.relationship('Faculty', foreign_keys=[mentor_id], backref='private_notes')
+    session = db.relationship('MentoringSession', foreign_keys=[session_id], backref='private_notes')
+
+
+class UserScheduleSettings(db.Model):
+    __tablename__ = 'user_schedule_settings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.String(20), db.ForeignKey('students.admission_number'), unique=True, nullable=False)
+    
+    # Personal Routine
+    wake_time = db.Column(db.String(5), default='05:45')  # HH:MM format
+    sleep_time = db.Column(db.String(5), default='23:00')
+    leave_home_time = db.Column(db.String(5), default='08:15')
+    arrive_home_time = db.Column(db.String(5), default='16:45')
+    city = db.Column(db.String(100), default='Kochi')
+    country = db.Column(db.String(50), default='India')
+    religion = db.Column(db.String(20), default='None')  # Muslim/Hindu/Christian/None
+    
+    # Gym
+    gym_enabled = db.Column(db.Boolean, default=False)
+    gym_time_pref = db.Column(db.String(20), default='Evening')  # Morning/Evening
+    gym_duration = db.Column(db.Integer, default=45)  # minutes: 30/45/60
+    
+    # Play/Recreation
+    play_duration = db.Column(db.Integer, default=30)  # minutes
+    
+    # ECA (Extra-Curricular Activities)
+    eca_details = db.Column(db.JSON, default=[])  
+    # Format: [{"name": "Music", "days": ["Mon", "Wed"], "duration": 60}]
+    
+    # Study Preferences
+    study_block_length = db.Column(db.Integer, default=45)  # 25/45/60 minutes
+    break_duration = db.Column(db.Integer, default=10)  # 5/10/15 minutes
+    priority_subjects = db.Column(db.JSON, default=[])  # ["Mathematics", "Physics"]
+    
+    # Optimization
+    auto_optimize = db.Column(db.Boolean, default=True)
+    
+    # College hours (default 9 AM - 4 PM)
+    college_start_time = db.Column(db.String(5), default='09:00')
+    college_end_time = db.Column(db.String(5), default='16:00')
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    student = db.relationship('Student', backref='schedule_settings')
+
+
+class DailySchedule(db.Model):
+    __tablename__ = 'daily_schedule'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.String(20), db.ForeignKey('students.admission_number'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    day_type = db.Column(db.String(10), nullable=False)  # 'weekday' or 'weekend'
+    slots = db.Column(db.JSON, nullable=False)  # Array of slot objects
+    generated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_optimized = db.Column(db.Boolean, default=True)
+    
+    __table_args__ = (
+        db.UniqueConstraint('student_id', 'date', name='unique_student_date_schedule'),
+    )
+    
+    student = db.relationship('Student', backref='daily_schedules')
+
+
+class CustomTimetable(db.Model):
+    __tablename__ = 'custom_timetables'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.String(20), db.ForeignKey('students.admission_number'), nullable=False)
+    day_of_week = db.Column(db.String(10), nullable=False)  # Monday, Tuesday, etc.
+    period_number = db.Column(db.Integer, nullable=False)
+    subject_name = db.Column(db.String(100), nullable=False)
+    start_time = db.Column(db.String(5))  # Optional: "09:00"
+    end_time = db.Column(db.String(5))    # Optional: "10:00"
+    
+    __table_args__ = (
+        db.UniqueConstraint('student_id', 'day_of_week', 'period_number', name='unique_custom_period'),
+    )
+    
+    student = db.relationship('Student', backref='custom_timetables')
+
+
+class RoutinePrefs(db.Model):
+    __tablename__ = 'routine_prefs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.String(20), db.ForeignKey('students.admission_number'), unique=True, nullable=False)
+    
+    wakeup_time = db.Column(db.String(10), default='06:00')
+    prayer_time = db.Column(db.String(10), default='06:30')
+    breakfast_time = db.Column(db.String(10), default='07:30')
+    college_start = db.Column(db.String(10), default='08:45')
+    college_end = db.Column(db.String(10), default='16:00')
+    refresh_time = db.Column(db.String(10), default='16:30')
+    play_time = db.Column(db.String(10), default='17:00')
+    food_time = db.Column(db.String(10), default='20:00')
+    bed_time = db.Column(db.String(10), default='22:30')
+    
+    student = db.relationship('Student', backref='routine_prefs')
+
+
+class RemedialClass(db.Model):
+    """Remedial classes scheduled by subject handlers for struggling students."""
+    __tablename__ = 'remedial_classes'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.String(20), db.ForeignKey('students.admission_number'), nullable=False)
+    subject_code = db.Column(db.String(50), nullable=False)
+    handler_id = db.Column(db.Integer, db.ForeignKey('faculty.id'), nullable=False)
+    mentor_id = db.Column(db.Integer, db.ForeignKey('faculty.id'), nullable=True)
+    
+    # Class details
+    title = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text)
+    scheduled_date = db.Column(db.Date, nullable=False)
+    time_slot = db.Column(db.String(20), nullable=False)  # e.g., "15:00-16:00"
+    duration_minutes = db.Column(db.Integer, default=60)
+    mode = db.Column(db.String(20), default='online')  # online/offline
+    meeting_link = db.Column(db.String(500))  # GMeet link or location
+    
+    # Status tracking
+    status = db.Column(db.String(20), default='scheduled')  # scheduled/completed/cancelled
+    reason = db.Column(db.Text)  # AI-generated reason for remedial
+    
+    # Tracking
+    attended = db.Column(db.Boolean, default=False)
+    feedback = db.Column(db.Text)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    student = db.relationship('Student', foreign_keys=[student_id])
+    handler = db.relationship('Faculty', foreign_keys=[handler_id])
+    mentor = db.relationship('Faculty', foreign_keys=[mentor_id])
+
+
+class AIPerformanceReport(db.Model):
+    """AI-generated performance analysis reports."""
+    __tablename__ = 'ai_performance_reports'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.String(20), db.ForeignKey('students.admission_number'), nullable=False)
+    subject_code = db.Column(db.String(50), nullable=True)  # NULL for overall report
+    handler_id = db.Column(db.Integer, db.ForeignKey('faculty.id'), nullable=True)
+    mentor_id = db.Column(db.Integer, db.ForeignKey('faculty.id'), nullable=True)
+    
+    # Report type
+    report_type = db.Column(db.String(30), nullable=False)  # individual/subject/mentees_summary
+    
+    # AI-generated content
+    analysis_data = db.Column(db.JSON, nullable=False)  # Structured analysis data
+    ai_insights = db.Column(db.Text, nullable=False)  # Human-readable insights
+    recommendations = db.Column(db.Text)  # Actionable recommendations
+    risk_assessment = db.Column(db.String(20))  # low/medium/high
+    performance_trend = db.Column(db.String(20))  # improving/stable/declining
+    
+    # Metadata
+    generated_by = db.Column(db.String(30), default='groq_ai')  # groq_ai/rule_based
+    generated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime)  # Reports expire after 7 days
+    
+    student = db.relationship('Student', foreign_keys=[student_id])
+    handler = db.relationship('Faculty', foreign_keys=[handler_id])
+    mentor = db.relationship('Faculty', foreign_keys=[mentor_id])
+
+
+class RemedialNotification(db.Model):
+    """Notifications for remedial class scheduling and updates."""
+    __tablename__ = 'remedial_notifications'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    remedial_class_id = db.Column(db.Integer, db.ForeignKey('remedial_classes.id'), nullable=False)
+    student_id = db.Column(db.String(20), db.ForeignKey('students.admission_number'), nullable=False)
+    handler_id = db.Column(db.Integer, db.ForeignKey('faculty.id'), nullable=False)
+    mentor_id = db.Column(db.Integer, db.ForeignKey('faculty.id'), nullable=True)
+    
+    notification_type = db.Column(db.String(30), nullable=False)  # scheduled/reminder/completed/cancelled
+    message = db.Column(db.Text, nullable=False)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    remedial_class = db.relationship('RemedialClass', foreign_keys=[remedial_class_id])
+    student = db.relationship('Student', foreign_keys=[student_id])
+    handler = db.relationship('Faculty', foreign_keys=[handler_id])
+    mentor = db.relationship('Faculty', foreign_keys=[mentor_id])
 

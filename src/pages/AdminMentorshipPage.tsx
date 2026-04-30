@@ -48,7 +48,7 @@ const isLastSem = (startYear: number, durationYears: number): boolean =>
 //   BTech  4yr  8 sems : start years 2022→2025  (4 active, 2022 is final)
 //   MCA    2yr  4 sems : start years 2024→2025  (2 active, 2024 is final)
 //   MBA    2yr  4 sems : same as MCA
-//   IMCA   5yr 10 sems : start from 2024 onward  (1 batch so far)
+//   IMCA   5yr 10 sems : started in 2024 (2024 and 2025 batches active in 2026)
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface BatchInfo {
@@ -86,12 +86,12 @@ const buildActiveBatches = (department: string): BatchInfo[] => {
 
     if (isCA) {
         const batches: BatchInfo[] = [];
-        // MCA  2yr, max 2 concurrent: starts 2024 & 2025
         for (let y = now - 2; y <= now - 1; y++) {
             batches.push(makeBatch(y, 2, 'MCA', 'MCA'));
         }
-        // IMCA 5yr: first batch 2024 only (still in sem 5 of 10)
-        batches.push(makeBatch(2024, 5, 'IMCA', 'IMCA'));
+        for (let y = 2024; y <= now - 1; y++) {
+            batches.push(makeBatch(y, 5, 'IMCA', 'IMCA'));
+        }
         return batches;
     }
 
@@ -136,7 +136,6 @@ const AdminMentorshipPage = () => {
     const [loading, setLoading] = useState(false);
     const [allocating, setAllocating] = useState(false);
     const [promotingAll, setPromotingAll] = useState(false);
-    const [promotingBatch, setPromotingBatch] = useState<string | null>(null); // batch label
 
     const [mentors, setMentors] = useState<MentorStats[]>([]);
     const [unassignedCount, setUnassignedCount] = useState(0);
@@ -210,41 +209,6 @@ const AdminMentorshipPage = () => {
         finally { setAllocating(false); }
     };
 
-    // ── Promote a single batch (next sem or alumni) ───────────────
-    const handlePromoteBatch = async (batch: BatchInfo) => {
-        const isFinal = batch.isFinal;
-        const confirmMsg = isFinal
-            ? `Promote batch "${batch.label}" (Sem ${batch.currentSem}/${batch.maxSem} — FINAL) to Alumni?\n\nAll students will be moved to the Alumni section.`
-            : `Advance batch "${batch.label}" from Sem ${batch.currentSem} → Sem ${batch.currentSem + 1}?\n\n(Semester is calendar-based; this will be recorded as acknowledged.)`;
-
-        if (!confirm(confirmMsg)) return;
-        setPromotingBatch(batch.label);
-
-        try {
-            const res = await fetch("http://localhost:5000/api/admin/semester/promote-batch", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    batch_label:    batch.label,
-                    department:     selectedDept ?? '',
-                    duration_years: batch.durationYears,
-                })
-            });
-            const data = await res.json();
-            if (data.success) {
-                if (data.to_alumni) {
-                    toast.success(`🎓 ${data.message}`);
-                    window.dispatchEvent(new CustomEvent('refreshAlumni'));
-                } else {
-                    toast.success(`📆 ${data.message}`);
-                }
-            } else {
-                toast.error(data.message || "Promotion failed");
-            }
-        } catch { toast.error("Promotion request failed"); }
-        finally { setPromotingBatch(null); }
-    };
-
     // ── Promote ALL final-sem batches across all departments ───────
     const handlePromoteAll = async () => {
         if (!confirm(
@@ -295,7 +259,7 @@ const AdminMentorshipPage = () => {
                     {promotingAll
                         ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         : <TrendingUp className="h-4 w-4 mr-2" />}
-                    Promote All Final Batches → Alumni
+                    Promote All Eligible Batches → Alumni
                 </Button>
             </div>
 
@@ -312,6 +276,7 @@ const AdminMentorshipPage = () => {
                     <div>BTech 2025–2029 → Sem 3/8</div>
                     <div>MBA   2025–2027 → Sem 3/4</div>
                     <div>IMCA  2024–2029 → Sem 5/10</div>
+                    <div>IMCA  2025–2030 → Sem 3/10</div>
                 </div>
             </div>
 
@@ -349,7 +314,7 @@ const AdminMentorshipPage = () => {
     );
 
     // ══════════════════════════════════════════════════════════════
-    // VIEW: Batch selection + per-batch promote button
+    // VIEW: Batch selection
     // ══════════════════════════════════════════════════════════════
     const renderBatchView = () => {
         const batches = selectedDept ? buildActiveBatches(selectedDept) : [];
@@ -362,31 +327,41 @@ const AdminMentorshipPage = () => {
                     </Button>
                     <div>
                         <h2 className="text-2xl font-bold">{selectedDept}</h2>
-                        <p className="text-muted-foreground text-sm">Select a batch to manage • Use "Promote" to advance semester or graduate final batches</p>
+                        <p className="text-muted-foreground text-sm">Select a batch to manage mentors. Promotions run from the dedicated all-batches button.</p>
                     </div>
                 </div>
 
                 {/* ALL BATCHES shortcut */}
-                <Button
-                    variant="outline"
-                    className="w-full h-12 text-base border-dashed border-2"
-                    onClick={() => { setSelectedBatch(null); setViewMode('mentorship'); }}
-                >
-                    <Users className="h-4 w-4 mr-2" /> View All Batches — Mentor Overview
-                </Button>
+                <div className="grid gap-3 md:grid-cols-2">
+                    <Button
+                        variant="outline"
+                        className="w-full h-12 text-base border-dashed border-2"
+                        onClick={() => { setSelectedBatch(null); setViewMode('mentorship'); }}
+                    >
+                        <Users className="h-4 w-4 mr-2" /> View All Batches — Mentor Overview
+                    </Button>
+                    <Button
+                        onClick={handlePromoteAll}
+                        disabled={promotingAll}
+                        className="w-full h-12 text-base bg-gradient-to-r from-orange-500 to-rose-600 hover:from-orange-600 hover:to-rose-700 text-white"
+                    >
+                        {promotingAll ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                            <TrendingUp className="h-4 w-4 mr-2" />
+                        )}
+                        Promote Eligible Batches → Alumni
+                    </Button>
+                </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
                     {batches.map((batch) => {
-                        const isProcessing = promotingBatch === batch.label;
                         const semColor = batch.isFinal
                             ? 'text-orange-600 dark:text-orange-400'
                             : 'text-primary';
                         const semLabel = batch.isFinal
                             ? `Semester ${batch.currentSem} / ${batch.maxSem} — FINAL`
                             : `Semester ${batch.currentSem} / ${batch.maxSem}`;
-                        const promoteLabel = batch.isFinal
-                            ? `Graduate → Alumni (Sem ${batch.currentSem}/${batch.maxSem})`
-                            : `Promote → Sem ${batch.currentSem + 1}`;
 
                         return (
                             <Card
@@ -417,7 +392,6 @@ const AdminMentorshipPage = () => {
                                 </CardHeader>
 
                                 <CardContent className="flex flex-col gap-2 pt-0">
-                                    {/* Mentor management */}
                                     <Button
                                         variant="secondary"
                                         className="w-full justify-start"
@@ -425,27 +399,6 @@ const AdminMentorshipPage = () => {
                                     >
                                         <Users className="h-4 w-4 mr-2" />
                                         Manage Mentors
-                                    </Button>
-
-                                    {/* Promote to next sem / alumni */}
-                                    <Button
-                                        variant={batch.isFinal ? "default" : "outline"}
-                                        className={`w-full justify-start ${
-                                            batch.isFinal
-                                                ? 'bg-orange-500 hover:bg-orange-600 text-white border-0'
-                                                : ''
-                                        }`}
-                                        disabled={isProcessing}
-                                        onClick={() => handlePromoteBatch(batch)}
-                                    >
-                                        {isProcessing ? (
-                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                        ) : batch.isFinal ? (
-                                            <GraduationCap className="h-4 w-4 mr-2" />
-                                        ) : (
-                                            <ChevronRight className="h-4 w-4 mr-2" />
-                                        )}
-                                        {promoteLabel}
                                     </Button>
                                 </CardContent>
                             </Card>

@@ -215,7 +215,6 @@ const AdminDashboard = () => {
         { label: "Overview", icon: <School className="h-4 w-4" />, path: "/dashboard/admin", isActive: true },
         { label: "Teachers", icon: <Users className="h-4 w-4" />, path: "/dashboard/admin/teachers" },
         { label: "Students", icon: <Users className="h-4 w-4" />, path: "/dashboard/admin/students" },
-        { label: "Departments", icon: <Building className="h-4 w-4" />, path: "/dashboard/admin/departments" },
         { label: "Alumni", icon: <GraduationCap className="h-4 w-4" />, path: "/dashboard/admin/alumni" },
         { label: "Timetables", icon: <FileText className="h-4 w-4" />, path: "/dashboard/admin/timetables" },
         { label: "Attendance", icon: <CheckCircle className="h-4 w-4" />, path: "/dashboard/admin/attendance" },

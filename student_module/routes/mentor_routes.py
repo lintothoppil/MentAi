@@ -125,14 +125,10 @@ def get_mentee_attendance(admission_number):
 @login_required
 @role_required('mentor', 'hod')
 def get_mentee_certificates(admission_number):
-    certs = Certificate.query.filter_by(student_id=admission_number).all()
-    return jsonify({'status': 'ok', 'data': [{
-        'id':            c.id,
-        'activity_name': c.activity_name,
-        'category':      c.category,
-        'date_of_event': str(c.date_of_event) if c.date_of_event else None,
-        'download_url':  f'/{c.file_path}' if c.file_path else None,
-    } for c in certs]}), 200
+    return jsonify({
+        'status': 'error',
+        'message': 'Access denied: Mentor cannot view student certificates',
+    }), 403
 
 
 @mentor_bp.route('/mentees/<admission_number>/issues', methods=['GET'])

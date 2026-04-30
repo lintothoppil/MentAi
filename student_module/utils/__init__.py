@@ -11,11 +11,11 @@ def send_otp_email(mail, recipient_email, otp):
     """Sends OTP to the specified email address using Flask-Mail."""
     try:
         msg = Message(
-            subject="Your MentorAI OTP Code",
+            subject="Your MentAi OTP Code",
             sender=current_app.config.get('MAIL_USERNAME'),
             recipients=[recipient_email]
         )
-        msg.body = f"Hello,\n\nYour OTP for resetting the password is: {otp}\n\nThis OTP is valid for 10 minutes.\n\nRegards,\nMentorAI Team"
+        msg.body = f"Hello,\n\nYour OTP for resetting the password is: {otp}\n\nThis OTP is valid for 10 minutes.\n\nRegards,\nMentAi Team"
         mail.send(msg)
         return True
     except Exception as e:

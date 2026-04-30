@@ -23,12 +23,15 @@ import {
 import { 
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
 
 import { Search, Users, GraduationCap, Building2, Calendar, Mail, User, Eye, School, BookOpen, CheckCircle2, UserPlus } from 'lucide-react';
+
+const API_BASE = "http://localhost:5000";
 
 interface Alumni {
   id: number;
@@ -64,7 +67,17 @@ interface DepartmentBatch {
   status: string;
 }
 
+interface AlumniMentorNote {
+  id: number;
+  mentor_name: string;
+  note_type: string;
+  content: string;
+  created_at: string | null;
+  transferred_at: string | null;
+}
+
 const AdminAlumniPage = () => {
+  const [activeTab, setActiveTab] = useState<string>('overview');
   const [departments, setDepartments] = useState<Department[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
@@ -76,11 +89,39 @@ const AdminAlumniPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalAlumni, setTotalAlumni] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [alumniNotes, setAlumniNotes] = useState<AlumniMentorNote[]>([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [selectedAlumniRecord, setSelectedAlumniRecord] = useState<Alumni | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  const openAlumniDetails = (alumni: Alumni) => {
+    setSelectedAlumniRecord(alumni);
+    setDetailsOpen(true);
+    fetchAlumniNotes(alumni.admission_number);
+  };
+
+  const fetchAlumniNotes = async (admissionNumber: string) => {
+    setLoadingNotes(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/admin/alumni/${encodeURIComponent(admissionNumber)}/mentor-notes`);
+      const data = await response.json();
+      if (data.success) {
+        setAlumniNotes(data.data);
+      } else {
+        setAlumniNotes([]);
+      }
+    } catch (error) {
+      console.error('Error fetching alumni mentor notes:', error);
+      setAlumniNotes([]);
+    } finally {
+      setLoadingNotes(false);
+    }
+  };
 
   // Fetch departments with alumni counts
   const fetchDepartments = async () => {
     try {
-      const response = await fetch('/api/admin/alumni/departments');
+      const response = await fetch(`${API_BASE}/api/admin/alumni/departments`);
       const data = await response.json();
       if (data.success) {
         setDepartments(data.data);
@@ -93,7 +134,7 @@ const AdminAlumniPage = () => {
   // Fetch all batches with alumni counts
   const fetchBatches = async () => {
     try {
-      const response = await fetch('/api/admin/alumni/batches');
+      const response = await fetch(`${API_BASE}/api/admin/alumni/batches`);
       const data = await response.json();
       if (data.success) {
         setBatches(data.data);
@@ -108,7 +149,7 @@ const AdminAlumniPage = () => {
     if (!deptName) return;
     
     try {
-      const response = await fetch(`/api/admin/alumni/department/${encodeURIComponent(deptName)}/batches`);
+      const response = await fetch(`${API_BASE}/api/admin/alumni/department/${encodeURIComponent(deptName)}/batches`);
       const data = await response.json();
       if (data.success) {
         setDepartmentBatches(data.data);
@@ -118,33 +159,20 @@ const AdminAlumniPage = () => {
     }
   };
 
-  // Fetch alumni for a specific department and batch
-  const fetchAlumniByDeptBatch = async (deptName: string, batchId: number) => {
-    if (!deptName || !batchId) return;
-    
-    try {
-      const response = await fetch(`/api/admin/alumni/department/${encodeURIComponent(deptName)}/batch/${batchId}`);
-      const data = await response.json();
-      if (data.success) {
-        setAlumniData(data.data);
-        setTotalAlumni(data.data.length);
-        setTotalPages(1);
-        setCurrentPage(1);
-      }
-    } catch (error) {
-      console.error('Error fetching alumni by department and batch:', error);
-    }
-  };
-
-  // Search alumni with filters
-  const searchAlumni = async (page: number = 1) => {
+  const searchAlumni = async (
+    page: number = 1,
+    overrides?: { searchTerm?: string; department?: string; batchId?: number | null }
+  ) => {
     setLoading(true);
     try {
-      let url = `/api/admin/alumni/search?page=${page}&per_page=20`;
+      let url = `${API_BASE}/api/admin/alumni/search?page=${page}&per_page=20`;
+      const effectiveSearchTerm = overrides?.searchTerm ?? searchTerm;
+      const effectiveDepartment = overrides?.department ?? selectedDepartment;
+      const effectiveBatch = overrides?.batchId ?? selectedBatch;
       
-      if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
-      if (selectedDepartment) url += `&department=${encodeURIComponent(selectedDepartment)}`;
-      if (selectedBatch) url += `&batch_year=${selectedBatch}`;
+      if (effectiveSearchTerm) url += `&search=${encodeURIComponent(effectiveSearchTerm)}`;
+      if (effectiveDepartment) url += `&department=${encodeURIComponent(effectiveDepartment)}`;
+      if (effectiveBatch) url += `&batch_id=${effectiveBatch}`;
       
       const response = await fetch(url);
       const data = await response.json();
@@ -170,17 +198,21 @@ const AdminAlumniPage = () => {
   useEffect(() => {
     if (selectedDepartment) {
       fetchDepartmentBatches(selectedDepartment);
+    } else {
+      setDepartmentBatches([]);
     }
   }, [selectedDepartment]);
 
   useEffect(() => {
     if (selectedDepartment && selectedBatch) {
-      fetchAlumniByDeptBatch(selectedDepartment, selectedBatch);
+      setActiveTab('search-results');
+      searchAlumni(1);
     }
   }, [selectedDepartment, selectedBatch]);
 
   const handleSearch = () => {
     if (searchTerm || selectedDepartment || selectedBatch) {
+      setActiveTab('search-results');
       searchAlumni(1);
     }
   };
@@ -189,6 +221,22 @@ const AdminAlumniPage = () => {
     if (searchTerm || selectedDepartment || selectedBatch) {
       searchAlumni(page);
     }
+  };
+
+  const handleDepartmentCardClick = async (department: string) => {
+    setSelectedDepartment(department);
+    setSelectedBatch(null);
+    setActiveTab('search-results');
+    await fetchDepartmentBatches(department);
+    await searchAlumni(1, { department, batchId: null, searchTerm: '' });
+  };
+
+  const handleBatchCardClick = async (batch: Batch) => {
+    setSelectedDepartment('');
+    setDepartmentBatches([]);
+    setSelectedBatch(batch.batch_id);
+    setActiveTab('search-results');
+    await searchAlumni(1, { department: '', batchId: batch.batch_id, searchTerm: '' });
   };
 
   const navItems = [
@@ -286,7 +334,7 @@ const AdminAlumniPage = () => {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="by-department">By Department</TabsTrigger>
@@ -294,9 +342,10 @@ const AdminAlumniPage = () => {
           <TabsTrigger value="search-results">Search Results</TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab */}
+        {(activeTab === 'overview' || activeTab === 'by-department' || activeTab === 'by-batch') && (
         <div className="space-y-6">
           {/* Department Cards */}
+          {(activeTab === 'overview' || activeTab === 'by-department') && (
           <Card>
             <CardHeader>
               <CardTitle>Departments Overview</CardTitle>
@@ -305,7 +354,11 @@ const AdminAlumniPage = () => {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {departments.map((dept) => (
-                  <Card key={dept.department} className="hover:bg-accent transition-colors cursor-pointer">
+                  <Card
+                    key={dept.department}
+                    className="hover:bg-accent transition-colors cursor-pointer"
+                    onClick={() => handleDepartmentCardClick(dept.department)}
+                  >
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-lg">{dept.department}</CardTitle>
@@ -323,8 +376,10 @@ const AdminAlumniPage = () => {
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Batch Cards */}
+          {(activeTab === 'overview' || activeTab === 'by-batch') && (
           <Card>
             <CardHeader>
               <CardTitle>Batches Overview</CardTitle>
@@ -333,7 +388,11 @@ const AdminAlumniPage = () => {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {batches.map((batch) => (
-                  <Card key={batch.batch_id} className="hover:bg-accent transition-colors cursor-pointer">
+                  <Card
+                    key={batch.batch_id}
+                    className="hover:bg-accent transition-colors cursor-pointer"
+                    onClick={() => handleBatchCardClick(batch)}
+                  >
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-lg">{batch.start_year}-{batch.end_year}</CardTitle>
@@ -356,9 +415,44 @@ const AdminAlumniPage = () => {
               </div>
             </CardContent>
           </Card>
+          )}
 
-          {/* Search Results Tab Content */}
-          {(searchTerm || selectedDepartment || selectedBatch) && (
+          {activeTab === 'by-department' && selectedDepartment && departmentBatches.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{selectedDepartment}</CardTitle>
+                <CardDescription>Click a batch to view alumni students.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {departmentBatches.map((batch) => (
+                    <Card
+                      key={batch.batch_id}
+                      className="hover:bg-accent transition-colors cursor-pointer"
+                      onClick={() => {
+                        setSelectedBatch(batch.batch_id);
+                        setActiveTab('search-results');
+                        searchAlumni(1, { department: selectedDepartment, batchId: batch.batch_id, searchTerm: '' });
+                      }}
+                    >
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg">{batch.start_year}-{batch.end_year}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex items-center justify-between">
+                        <span className="text-xl font-bold">{batch.alumni_count}</span>
+                        <Badge variant="outline">Alumni</Badge>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          </div>
+        )}
+
+          {activeTab === 'search-results' && (
             <Card>
               <CardHeader>
                 <CardTitle>Search Results</CardTitle>
@@ -381,64 +475,34 @@ const AdminAlumniPage = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {alumniData.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                          No alumni found for the selected department, batch, or search term.
+                        </TableCell>
+                      </TableRow>
+                    )}
                     {alumniData.map((alumni) => (
                       <TableRow key={alumni.id}>
                         <TableCell className="font-medium">{alumni.admission_number}</TableCell>
-                        <TableCell>{alumni.name}</TableCell>
+                        <TableCell>
+                          <button
+                            type="button"
+                            className="text-left font-medium text-primary hover:underline"
+                            onClick={() => openAlumniDetails(alumni)}
+                          >
+                            {alumni.name}
+                          </button>
+                        </TableCell>
                         <TableCell>{alumni.email}</TableCell>
                         <TableCell>{alumni.department}</TableCell>
                         <TableCell>{alumni.course_name}</TableCell>
                         <TableCell>{alumni.batch_start_year}-{alumni.batch_end_year}</TableCell>
                         <TableCell>{alumni.passout_year}</TableCell>
                         <TableCell>
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Alumni Details</DialogTitle>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <h4 className="font-medium">Admission Number</h4>
-                                    <p>{alumni.admission_number}</p>
-                                  </div>
-                                  <div>
-                                    <h4 className="font-medium">Name</h4>
-                                    <p>{alumni.name}</p>
-                                  </div>
-                                  <div>
-                                    <h4 className="font-medium">Email</h4>
-                                    <p>{alumni.email}</p>
-                                  </div>
-                                  <div>
-                                    <h4 className="font-medium">Department</h4>
-                                    <p>{alumni.department}</p>
-                                  </div>
-                                  <div>
-                                    <h4 className="font-medium">Course</h4>
-                                    <p>{alumni.course_name}</p>
-                                  </div>
-                                  <div>
-                                    <h4 className="font-medium">Batch</h4>
-                                    <p>{alumni.batch_start_year}-{alumni.batch_end_year}</p>
-                                  </div>
-                                  <div>
-                                    <h4 className="font-medium">Passout Year</h4>
-                                    <p>{alumni.passout_year}</p>
-                                  </div>
-                                  <div>
-                                    <h4 className="font-medium">Joined</h4>
-                                    <p>{alumni.created_at}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
+                          <Button variant="ghost" size="sm" onClick={() => openAlumniDetails(alumni)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -471,8 +535,77 @@ const AdminAlumniPage = () => {
               </CardContent>
             </Card>
           )}
-        </div>
       </Tabs>
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alumni Details</DialogTitle>
+            <DialogDescription>
+              Mentor-private notes are shown here only after the student has been transferred to alumni.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedAlumniRecord && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium">Admission Number</h4>
+                  <p>{selectedAlumniRecord.admission_number}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Name</h4>
+                  <p>{selectedAlumniRecord.name}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Email</h4>
+                  <p>{selectedAlumniRecord.email}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Department</h4>
+                  <p>{selectedAlumniRecord.department}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Course</h4>
+                  <p>{selectedAlumniRecord.course_name}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Batch</h4>
+                  <p>{selectedAlumniRecord.batch_start_year}-{selectedAlumniRecord.batch_end_year}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Passout Year</h4>
+                  <p>{selectedAlumniRecord.passout_year}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Joined</h4>
+                  <p>{selectedAlumniRecord.created_at}</p>
+                </div>
+              </div>
+              <div className="space-y-3 border-t pt-4">
+                <h4 className="font-medium">Transferred Mentor Notes</h4>
+                {loadingNotes ? (
+                  <p className="text-sm text-muted-foreground">Loading mentor archive...</p>
+                ) : alumniNotes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No transferred mentor notes found for this alumni record.</p>
+                ) : (
+                  alumniNotes.map((note) => (
+                    <div key={note.id} className="rounded-lg border p-3">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <Badge variant="outline" className="capitalize">{note.note_type}</Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {note.created_at ? new Date(note.created_at).toLocaleString('en-IN') : 'Unknown time'}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium mb-1">{note.mentor_name}</p>
+                      <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
     </DashboardLayout>
   );

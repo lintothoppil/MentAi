@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "Dashboard" }} - MentorIA</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+      rel="stylesheet"
+    />
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: { primary: "#0EA5E9", bgd: "#0F172A", card: "#1E293B" },
+            fontFamily: { sans: ["Inter", "sans-serif"], display: ["Outfit", "sans-serif"] },
+          },
+        },
+      };
+      async function switchRole(role) {
+        try {
+          const res = await fetch("/api/faculty/switch-role", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ role }),
+          });
+          const json = await res.json();
+          if (!res.ok || !json.success) {
+            alert((json && json.message) || "Role switch failed");
+            return;
+          }
+          const next = json.data && json.data.role ? json.data.role : role;
+          if (next === "subject-handler") window.location.href = "/subject-handler/dashboard";
+          else if (next === "mentor") window.location.href = "/mentor/dashboard";
+          else if (next === "hod") window.location.href = "/mentor/dashboard";
+          else window.location.reload();
+        } catch (e) {
+          alert("Role switch failed");
+        }
+      }
+    </script>
+  </head>
+  <body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+    <nav class="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur">
+      <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
+            <span class="material-symbols-outlined text-primary">school</span>
+          </div>
+          <div>
+            <div class="font-display font-bold leading-tight">MentorIA</div>
+            <div class="text-xs text-slate-400 leading-tight">{{ faculty.name if faculty else "" }}</div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300">
+            Role: {{ active_role }}
+          </span>
+
+          {% if allowed_roles and ('mentor' in allowed_roles) and ('subject-handler' in allowed_roles) %}
+            {% if active_role == 'mentor' %}
+              <button onclick="switchRole('subject-handler')" class="px-3 py-2 rounded-xl bg-primary text-white text-sm font-semibold">
+                Switch to Subject Handler
+              </button>
+            {% else %}
+              <button onclick="switchRole('mentor')" class="px-3 py-2 rounded-xl bg-primary text-white text-sm font-semibold">
+                Switch to Mentor
+              </button>
+            {% endif %}
+          {% endif %}
+
+          <a href="/" class="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm hover:bg-white/10">
+            Home
+          </a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto px-4 py-8">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>
+

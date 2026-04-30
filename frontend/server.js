@@ -18,7 +18,7 @@ app.use(bodyParser.json());
 
 // Session configuration
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'mentorai_session_secret',
+  secret: process.env.SESSION_SECRET || 'mentai_session_secret',
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -183,6 +183,6 @@ app.get('/forgot-password', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`✅ MentorAI Frontend Server running on http://localhost:${PORT}`);
+console.log(`✅ MentAi Frontend Server running on http://localhost:${PORT}`);
     console.log(`✅ Connected to Flask API at ${FLASK_API_URL}`);
 });

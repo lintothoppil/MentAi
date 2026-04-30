@@ -114,55 +114,129 @@ def normalize_dept(d: str) -> str:
     """Helper to heavily normalize department strings to fix mismatches"""
     if not d:
         return ""
-    return d.strip().lower().replace("-", " ").replace("_", " ")
+    normalized = d.strip().lower().replace("-", " ").replace("_", " ")
+    normalized = " ".join(normalized.split())
+
+    dept_aliases = {
+        "mca": "department of computer applications",
+        "imca": "department of computer applications",
+        "computer applications": "department of computer applications",
+        "department of computer applications": "department of computer applications",
+        "mba": "department of business administration",
+        "business administration": "department of business administration",
+        "department of business administration": "department of business administration",
+        "bsh": "basic sciences & humanities",
+        "basic science and humanities": "basic sciences & humanities",
+        "basic sciences and humanities": "basic sciences & humanities",
+        "basic sciences & humanities": "basic sciences & humanities",
+    }
+
+    return dept_aliases.get(normalized, normalized)
+
+
+def _faculty_sort_key(faculty: Faculty):
+    return ((faculty.name or "").strip().lower(), faculty.id)
+
+
+def _student_sort_key(student: Student):
+    return ((student.admission_number or "").strip().upper(), (student.full_name or "").strip().lower())
+
+
+def get_department_student_filter(department: str):
+    """Build a student filter that supports department aliases like MCA/IMCA."""
+    norm_target = normalize_dept(department)
+
+    if norm_target == "department of computer applications":
+        return or_(
+            Student.branch.ilike("MCA"),
+            Student.branch.ilike("IMCA"),
+            Student.branch.ilike("%Computer Applications%"),
+        )
+
+    if norm_target == "department of business administration":
+        return or_(
+            Student.branch.ilike("MBA"),
+            Student.branch.ilike("%Business Administration%"),
+            Student.branch.ilike("%Management%"),
+        )
+
+    return Student.branch.ilike(department.strip())
+
+
+def get_department_faculty_filter(department: str):
+    """Build a faculty filter that supports department aliases like MCA/IMCA."""
+    norm_target = normalize_dept(department)
+
+    if norm_target == "department of computer applications":
+        return or_(
+            Faculty.department.ilike("MCA"),
+            Faculty.department.ilike("IMCA"),
+            Faculty.department.ilike("%Computer Applications%"),
+        )
+
+    if norm_target == "department of business administration":
+        return or_(
+            Faculty.department.ilike("MBA"),
+            Faculty.department.ilike("%Business Administration%"),
+            Faculty.department.ilike("%Management%"),
+        )
+
+    return Faculty.department.ilike(department.strip())
 
 def is_mentor_eligible(faculty: Faculty) -> bool:
     """
     Requirement 2 Helper: Compute whether a faculty member is eligible to be a mentor.
     Ignores HODs, Admins, and Basic Science/Humanities faculty.
     """
-    ineligible_depts = ["basic science and humanities"]
-    ineligible_designations = ["hod", "admin"]
-    
-    # Safely handle potentially None values
+    ineligible_depts = {"basic sciences & humanities"}
+    ineligible_designations = {"hod", "admin"}
+
     dept = normalize_dept(faculty.department)
-    desig = faculty.designation.lower().strip() if faculty.designation else ""
-    
-    return dept not in ineligible_depts and desig not in ineligible_designations
+    desig = (faculty.designation or "").strip().lower()
+    status = (faculty.status or "").strip().lower()
+
+    return (
+        status == "live"
+        and dept not in ineligible_depts
+        and desig not in ineligible_designations
+        and not bool(getattr(faculty, "is_hod", False))
+    )
 
 def get_eligible_mentors(department: str) -> list:
     """Helper to fetch eligible mentors matching the normalized department string."""
     norm_target = normalize_dept(department)
-    faculty_list = Faculty.query.filter_by(status="Live").all()
-    
+    faculty_list = Faculty.query.filter(
+        get_department_faculty_filter(department),
+        Faculty.status.ilike("live")
+    ).all()
+
     eligible = [
         f for f in faculty_list
         if normalize_dept(f.department) == norm_target and is_mentor_eligible(f)
     ]
-    return eligible
+    return sorted(eligible, key=_faculty_sort_key)
 
 def fetch_batch_students(department: str, batch_id: int, batch_label: str) -> list:
     # Not used directly in the updated full/incremental anymore, but kept for compatibility
     pass
 
+
+def get_canonical_batch_label(batch_id: int | None, fallback_label: str | None = None) -> str | None:
+    """Return a normalized YYYY-YYYY batch label for allocator calls."""
+    if batch_id is not None:
+        batch = Batch.query.get(batch_id)
+        if batch:
+            return f"{batch.start_year}-{batch.end_year}"
+
+    years = extract_year_range(fallback_label or "")
+    if years:
+        return f"{years[0]}-{years[1]}"
+
+    cleaned = (fallback_label or "").strip()
+    return cleaned or None
+
 def redistribute_mentors_full(department: str, batch_id: int,
                                batch_label: str) -> dict:
-    import re
-    from datetime import datetime
-    
-    def extract_year_range(s):
-        m = re.search(r'(\d{4})\s*-\s*(\d{4})', str(s or ''))
-        return (int(m.group(1)), int(m.group(2))) if m else None
-    
-    def is_eligible(f):
-        ineligible = ['hod', 'admin']
-        ineligible_depts = ['basic science and humanities']
-        return (
-            f.designation.lower() not in ineligible
-            and f.department.strip().lower() not in ineligible_depts
-            and f.status.lower() == 'live'
-        )
-    
     try:
         # Get batch record to find course
         batch = Batch.query.get(batch_id)
@@ -178,7 +252,7 @@ def redistribute_mentors_full(department: str, batch_id: int,
         # AND course match via batch relationship
         all_dept = Student.query.filter(
             Student.status.ilike('live'),
-            Student.branch.ilike(department.strip())
+            get_department_student_filter(department)
         ).all()
         
         matched = {}
@@ -196,8 +270,7 @@ def redistribute_mentors_full(department: str, batch_id: int,
                     if course_prefix in (s.batch or '').upper():
                         matched[s.admission_number] = s
         
-        students = sorted(matched.values(), 
-                         key=lambda s: s.admission_number)
+        students = sorted(matched.values(), key=_student_sort_key)
         
         if not students:
             return {
@@ -215,11 +288,7 @@ def redistribute_mentors_full(department: str, batch_id: int,
             }
         
         # Get eligible mentors
-        all_faculty = Faculty.query.filter(
-            Faculty.department.ilike(department.strip()),
-            Faculty.status.ilike('live')
-        ).all()
-        eligible = [f for f in all_faculty if is_eligible(f)]
+        eligible = get_eligible_mentors(department)
         
         if not eligible:
             return {
@@ -227,7 +296,9 @@ def redistribute_mentors_full(department: str, batch_id: int,
                 "debug": {
                     "faculty_found": [
                         f"{f.name} ({f.designation})" 
-                        for f in all_faculty
+                        for f in Faculty.query.filter(
+                            get_department_faculty_filter(department)
+                        ).all()
                     ]
                 }
             }
@@ -287,7 +358,7 @@ def redistribute_mentors_incremental(department: str, batch_id: int,
         # Get all students in this department (exact case-insensitive match)
         all_dept_students = Student.query.filter(
             Student.status.ilike("live"),
-            Student.branch.ilike(department.strip())
+            get_department_student_filter(department)
         ).all()
         
         # Match students by batch_id OR by year range
@@ -302,18 +373,12 @@ def redistribute_mentors_incremental(department: str, batch_id: int,
                     all_batch_students_dict[s.admission_number] = s
         
         # Convert to list and sort
-        all_batch_students = sorted(
-            all_batch_students_dict.values(),
-            key=lambda s: s.admission_number
-        )
+        all_batch_students = sorted(all_batch_students_dict.values(), key=_student_sort_key)
 
         # Separate assigned and unassigned
         assigned_students = [s for s in all_batch_students 
                               if s.mentor_id is not None]
-        unassigned_students = sorted(
-            [s for s in all_batch_students if s.mentor_id is None],
-            key=lambda s: s.admission_number
-        )
+        unassigned_students = sorted([s for s in all_batch_students if s.mentor_id is None], key=_student_sort_key)
         
         if not unassigned_students:
             return {
@@ -322,22 +387,7 @@ def redistribute_mentors_incremental(department: str, batch_id: int,
                 "total_students": len(all_batch_students)
             }
         
-        # Get eligible mentors with exact department match
-        def is_eligible(f):
-            ineligible_designations = ['hod', 'admin']
-            ineligible_depts = ['basic science and humanities']
-            return (
-                f.designation.lower() not in ineligible_designations
-                and f.department.strip().lower() not in ineligible_depts
-                and f.status.lower() == 'live'
-            )
-        
-        all_faculty = Faculty.query.filter(
-            Faculty.department.ilike(department.strip()),
-            Faculty.status.ilike('live')
-        ).all()
-        
-        eligible_mentors = [f for f in all_faculty if is_eligible(f)]
+        eligible_mentors = get_eligible_mentors(department)
         
         if not eligible_mentors:
             return {"error": "No eligible mentors found for department"}
@@ -400,6 +450,170 @@ def redistribute_mentors_incremental(department: str, batch_id: int,
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}
+
+
+def rebalance_department_batches(department: str, batch_ids: list[int]) -> dict:
+    """
+    Fully reassign every provided batch across the currently eligible live mentors.
+    Used when a mentor goes on leave, becomes inactive, returns, or is deleted.
+    """
+    processed = []
+    errors = []
+    total_students = 0
+    mentor_counts = []
+
+    for batch_id in sorted({int(bid) for bid in batch_ids if bid is not None}):
+        batch = Batch.query.get(batch_id)
+        if not batch:
+            continue
+
+        batch_label = f"{batch.start_year}-{batch.end_year}"
+        result = redistribute_mentors_full(department, batch_id, batch_label)
+
+        if result.get("error"):
+            errors.append(f"Batch {batch_label}: {result['error']}")
+            continue
+
+        processed.append(batch_label)
+        total_students += result.get("total_students", 0)
+        mentor_counts.append(result.get("total_mentors", 0))
+
+    return {
+        "success": len(errors) == 0,
+        "processed_batches": processed,
+        "total_students": total_students,
+        "max_mentors_used": max(mentor_counts) if mentor_counts else 0,
+        "errors": errors,
+    }
+
+
+def auto_allocate_batches(affected_batches: list[tuple[str, int, str | None]], mode: str = "incremental") -> dict:
+    """
+    Allocate mentors for the given department/batch combinations.
+    Uses incremental mode by default so existing correct assignments stay intact.
+    """
+    processed = []
+    errors = []
+    total_assigned = 0
+
+    unique_batches = []
+    seen = set()
+    for department, batch_id, batch_label in affected_batches:
+        if not department or batch_id is None:
+            continue
+        key = (department.strip(), int(batch_id))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_batches.append((department.strip(), int(batch_id), batch_label))
+
+    for department, batch_id, batch_label in unique_batches:
+        canonical_label = get_canonical_batch_label(batch_id, batch_label)
+        if not canonical_label:
+            errors.append(f"{department} batch {batch_id}: missing batch label")
+            continue
+
+        result = redistribute_mentors(
+            department=department,
+            batch_id=batch_id,
+            batch_label=canonical_label,
+            mode=mode
+        )
+
+        if result.get("error"):
+            errors.append(f"{department} {canonical_label}: {result['error']}")
+            continue
+
+        processed.append({
+            "department": department,
+            "batch": canonical_label,
+            "result": result
+        })
+        total_assigned += result.get("newly_assigned", result.get("total_students", 0))
+
+    return {
+        "success": len(errors) == 0,
+        "processed": processed,
+        "total_assigned": total_assigned,
+        "errors": errors,
+    }
+
+
+def auto_allocate_unassigned_students() -> dict:
+    """
+    Heal any currently live students without mentors by redistributing only the
+    affected batches. This is safe to run on startup and after bulk imports.
+    """
+    unassigned_students = Student.query.filter(
+        Student.status.ilike("live"),
+        Student.mentor_id.is_(None),
+        Student.batch_id.isnot(None)
+    ).all()
+
+    affected_batches = []
+    for student in unassigned_students:
+        if not student.branch or student.batch_id is None:
+            continue
+        affected_batches.append((student.branch, student.batch_id, student.batch))
+
+    result = auto_allocate_batches(affected_batches, mode="incremental")
+    result["unassigned_students_found"] = len(unassigned_students)
+    return result
+
+
+def auto_heal_invalid_mentor_assignments() -> dict:
+    """
+    Reassign live students whose current mentor is missing or no longer eligible.
+    We rebalance the whole affected batch so the final distribution stays consistent.
+    """
+    invalid_students = []
+    for student in Student.query.filter(Student.status.ilike("live")).all():
+        mentor = Faculty.query.get(student.mentor_id) if student.mentor_id else None
+        if mentor is None or not is_mentor_eligible(mentor):
+            invalid_students.append(student)
+
+    affected_batches = {}
+    for student in invalid_students:
+        if not student.branch or student.batch_id is None:
+            continue
+        key = (student.branch.strip(), int(student.batch_id))
+        affected_batches[key] = student.batch
+
+    processed = []
+    errors = []
+    total_students = 0
+
+    for (department, batch_id), batch_label in sorted(affected_batches.items()):
+        canonical_label = get_canonical_batch_label(batch_id, batch_label)
+        if not canonical_label:
+            errors.append(f"{department} batch {batch_id}: missing batch label")
+            continue
+
+        result = redistribute_mentors(
+            department=department,
+            batch_id=batch_id,
+            batch_label=canonical_label,
+            mode="full"
+        )
+
+        if result.get("error"):
+            errors.append(f"{department} {canonical_label}: {result['error']}")
+            continue
+
+        processed.append({
+            "department": department,
+            "batch": canonical_label,
+            "result": result
+        })
+        total_students += result.get("total_students", 0)
+
+    return {
+        "success": len(errors) == 0,
+        "invalid_students_found": len(invalid_students),
+        "processed": processed,
+        "total_students_rebalanced": total_students,
+        "errors": errors,
+    }
 
 def redistribute_mentors(department: str, batch_id: int, batch_label: str, mode: str = "incremental") -> dict:
     """

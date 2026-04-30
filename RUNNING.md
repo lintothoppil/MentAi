@@ -1,4 +1,4 @@
-# 🎉 MentorAI is RUNNING! ✅
+# 🎉 MentAi is RUNNING! ✅
 
 ## ✅ Server Status: ACTIVE
 
@@ -152,7 +152,7 @@ Backend: `python student_module/app.py`
 
 ## 🎉 Success!
 
-Your **MentorAI Student Authentication & Profile System** is now running!
+Your **MentAi Student Authentication & Profile System** is now running!
 
 **Frontend**: ✅ Running (5173)
 **Backend**: ✅ Running (5000)
@@ -163,4 +163,4 @@ Your **MentorAI Student Authentication & Profile System** is now running!
 
 ---
 
-© 2026 MentorAI. All rights reserved.
+© 2026 MentAi. All rights reserved.

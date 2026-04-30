@@ -24,6 +24,7 @@ def generate_study_plan(student_id, base_hours=14):
         boost_applied = "None"
         
     # 2. Per-Subject Processing
+    student = Student.query.get(student_id)
     marks = InternalMark.query.filter_by(student_id=student_id).all()
     subj_data = {}
     
@@ -33,11 +34,23 @@ def generate_study_plan(student_id, base_hours=14):
                 "name": m.subject.name,
                 "Internal1": None,
                 "Internal2": None,
-                "fails": 0
+                "fails": m.marks < 40 if m.marks else 0
             }
         subj_data[m.subject_id][m.exam_type] = m.marks
         if m.marks < 40:
             subj_data[m.subject_id]["fails"] += 1
+            
+    # Fallback: If no marks, use batch subjects
+    if not subj_data and student and student.batch_id:
+        course_id = student.batch_info.course_id
+        batch_subjects = Subject.query.filter_by(course_id=course_id).all()
+        for s in batch_subjects:
+            subj_data[s.id] = {
+                "name": s.name,
+                "Internal1": None,
+                "Internal2": None,
+                "fails": 0
+            }
             
     subjects = []
     total_weakness = 0.0

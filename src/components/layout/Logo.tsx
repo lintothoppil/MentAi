@@ -55,7 +55,7 @@ export function Logo({ variant = "dark", size = "md", className }: LogoProps) {
           textColor,
           size === "sm" ? "text-lg" : size === "md" ? "text-xl" : "text-2xl"
         )}>
-          MENTOR<span className={accentColor}>-AI</span>
+          Ment<span className={accentColor}>Ai</span>
         </span>
         {size !== "sm" && (
           <span className={cn(

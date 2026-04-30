@@ -54,7 +54,7 @@ const Index = () => {
         <nav className="relative z-10 flex items-center justify-between px-6 py-4 md:px-12">
           <div className="flex items-center gap-2">
             <Brain className="h-8 w-8 text-accent" />
-            <span className="text-xl font-bold text-white">MENTOR-AI</span>
+            <span className="text-xl font-bold text-white">MentAi</span>
           </div>
           <div className="flex gap-3">
             <Button
@@ -80,13 +80,13 @@ const Index = () => {
             transition={{ duration: 0.7 }}
           >
             <h1 className="mb-4 text-5xl font-extrabold tracking-tight text-white md:text-7xl">
-              MENTOR-<span className="text-accent">AI</span>
+              Ment<span className="text-accent">Ai</span>
             </h1>
             <p className="mx-auto mb-8 max-w-2xl text-lg text-white/90 md:text-xl">
               AI-Assisted Academic Mentoring & Performance Analytics for Colleges
             </p>
             <p className="mx-auto mb-10 max-w-xl text-sm text-white/80 font-medium">
-              Digital mentoring • Academic tracking • Stress & performance insights — empowering students and educators with intelligent analytics.
+              Digital mentoring • Academic tracking • Performance insights — empowering students and educators with intelligent analytics.
             </p>
           </motion.div>
 
@@ -178,13 +178,13 @@ const Index = () => {
         <div className="mx-auto max-w-5xl text-center">
           <div className="mb-4 flex items-center justify-center gap-2">
             <Brain className="h-5 w-5 text-accent" />
-            <span className="font-bold text-foreground">MENTOR-AI</span>
+            <span className="font-bold text-foreground">MentAi</span>
           </div>
           <p className="mb-2 text-xs text-muted-foreground">
             For academic use only. This platform does not provide medical diagnosis or professional counseling.
           </p>
           <p className="text-xs text-muted-foreground">
-            Privacy-first approach • All data processed ethically • © {new Date().getFullYear()} MENTOR-AI
+            Privacy-first approach • All data processed ethically • © {new Date().getFullYear()} MentAi for SJCET, Palai
           </p>
         </div>
       </footer>

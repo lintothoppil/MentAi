@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo  MentorAI - Node.js Frontend Setup
+echo  MentAi - Node.js Frontend Setup
 echo ========================================
 echo.
 

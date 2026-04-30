@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     LayoutDashboard, Users, Calendar, TrendingUp, Clock, CheckCircle,
     XCircle, AlertTriangle, Loader2, Video, MapPin, Plus, Trash2,
-    RefreshCw, User, GraduationCap, Activity, Phone, Mail, ChevronDown, ChevronUp,
+    RefreshCw, User, GraduationCap, Activity, Phone, Mail, ChevronDown, ChevronUp, BookOpen
 } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -25,6 +26,8 @@ const navItems = [
     { label: "My Mentees",  icon: <Users className="h-4 w-4" />,          path: "/dashboard/mentor/mentees" },
     { label: "Sessions",    icon: <Calendar className="h-4 w-4" />,       path: "/dashboard/mentor/sessions", isActive: true },
     { label: "Timetable",   icon: <Calendar className="h-4 w-4" />,       path: "/dashboard/faculty/timetable" },
+    { label: "Academics",   icon: <BookOpen className="h-4 w-4" />,       path: "/dashboard/mentor/academics" },
+    { label: "AI Reports",  icon: <TrendingUp className="h-4 w-4" />,     path: "/dashboard/mentor/ai-reports" },
     { label: "Reports",     icon: <TrendingUp className="h-4 w-4" />,     path: "/dashboard/mentor/reports" },
 ];
 
@@ -39,6 +42,8 @@ interface Session {
     student_id: string;
     notes: string;
     meeting_link: string;
+    absence_reason?: string;
+    attendance_marked_at?: string | null;
 }
 
 interface Leave {
@@ -91,10 +96,19 @@ interface StudentDetail {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-    Approved:  "bg-green-100 text-green-800 border-green-200",
-    Pending:   "bg-yellow-100 text-yellow-800 border-yellow-200",
-    Rejected:  "bg-red-100 text-red-800 border-red-200",
-    Cancelled: "bg-gray-100 text-gray-500 border-gray-200",
+    Approved:  "bg-emerald-50 text-emerald-700 border-emerald-200",
+    Pending:   "bg-amber-50 text-amber-700 border-amber-200",
+    Rejected:  "bg-red-50 text-red-700 border-red-200",
+    Cancelled: "bg-slate-100 text-slate-500 border-slate-200",
+    Attended:  "bg-indigo-50 text-indigo-700 border-indigo-200",
+    Absent:    "bg-rose-50 text-rose-700 border-rose-200",
+};
+
+// Helper: parse session datetime from date ("YYYY-MM-DD") + time_slot ("09:00" or "9:00 - 10:00")
+const getSessionDateTime = (date: string, time_slot: string): Date => {
+    const timeStr = (time_slot || "00:00").split('-')[0].trim();
+    const [h, m] = timeStr.split(':').map(Number);
+    return new Date(`${date}T${String(h).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}:00`);
 };
 
 const FMT_TIME = (t: string) => {
@@ -293,6 +307,14 @@ export default function MentorSessionsPage() {
     const [rescheduleTime, setRescheduleTime] = useState("");
     const [rescheduleMessage, setRescheduleMessage] = useState("");
     const [responding, setResponding] = useState(false);
+    const [noteTarget, setNoteTarget] = useState<Session | null>(null);
+    const [privateNoteType, setPrivateNoteType] = useState("session");
+    const [privateNoteContent, setPrivateNoteContent] = useState("");
+    const [savingPrivateNote, setSavingPrivateNote] = useState(false);
+    const [attendanceTarget, setAttendanceTarget] = useState<Session | null>(null);
+    const [attendanceStatus, setAttendanceStatus] = useState<"Attended" | "Absent">("Attended");
+    const [absenceReason, setAbsenceReason] = useState("");
+    const [savingAttendance, setSavingAttendance] = useState(false);
 
     // Leave modal
     const [leaveOpen, setLeaveOpen] = useState(false);
@@ -328,7 +350,7 @@ export default function MentorSessionsPage() {
     const isRescheduleRequest = (notes: string) =>
         notes && notes.includes("[Reschedule Requested");
 
-    const handleRespond = async (action: "approve" | "reject" | "cancel" | "reschedule") => {
+    const handleRespond = async (action: "approve" | "reject" | "cancel" | "reschedule" | "Attended" | "Absent") => {
         if (!respondTarget) return;
         setResponding(true);
         try {
@@ -339,19 +361,22 @@ export default function MentorSessionsPage() {
                 if (rescheduleTime) body.time_slot = rescheduleTime;
                 if (rescheduleMessage) body.message = rescheduleMessage;
             }
-            const res = await fetch(`http://localhost:5000/api/session/${respondTarget.id}/respond`, {
+            
+            // Attendance/Status update endpoint usually the same or similar
+            const endpoint = (action === "Attended" || action === "Absent") 
+                ? `http://localhost:5000/api/session/${respondTarget.id}/status`
+                : `http://localhost:5000/api/session/${respondTarget.id}/respond`;
+
+            const res = await fetch(endpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
+                body: JSON.stringify(action === "Attended" || action === "Absent" ? { status: action } : body),
             });
             const d = await res.json();
             if (d.success) {
-                toast.success(d.message);
+                toast.success(d.message || `Session marked as ${action}`);
                 setRespondTarget(null);
                 setMeetingLink("");
-                setRescheduleDate("");
-                setRescheduleTime("");
-                setRescheduleMessage("");
                 fetchSessions();
             } else {
                 toast.error(d.message);
@@ -401,54 +426,209 @@ export default function MentorSessionsPage() {
         } catch { toast.error("Network error"); }
     };
 
-    const pending   = sessions.filter(s => s.status === "Pending");
-    const upcoming  = sessions.filter(s => s.status === "Approved");
-    const past      = sessions.filter(s => ["Rejected", "Cancelled"].includes(s.status));
+    const handleSavePrivateNote = async () => {
+        if (!noteTarget || !privateNoteContent.trim()) {
+            toast.error("Please enter a note");
+            return;
+        }
 
-    const SessionCard = ({ s }: { s: Session }) => {
+        setSavingPrivateNote(true);
+        try {
+            const res = await fetch("http://localhost:5000/api/mentor/private-notes", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    mentor_id: mentorId,
+                    student_id: noteTarget.student_id,
+                    session_id: noteTarget.id,
+                    note_type: privateNoteType,
+                    content: privateNoteContent.trim(),
+                }),
+            });
+            const d = await res.json();
+            if (d.success) {
+                toast.success("Private session note saved");
+                setNoteTarget(null);
+                setPrivateNoteContent("");
+                setPrivateNoteType("session");
+            } else {
+                toast.error(d.message || "Failed to save note");
+            }
+        } catch {
+            toast.error("Failed to save note");
+        } finally {
+            setSavingPrivateNote(false);
+        }
+    };
+
+    const openAttendanceDialog = (session: Session, status: "Attended" | "Absent") => {
+        setAttendanceTarget(session);
+        setAttendanceStatus(status);
+        setAbsenceReason(status === "Absent" ? (session.absence_reason || "") : "");
+    };
+
+    const handleSubmitAttendance = async () => {
+        if (!attendanceTarget) return;
+        if (attendanceStatus === "Absent" && !absenceReason.trim()) {
+            toast.error("Please enter the reason for absence");
+            return;
+        }
+
+        setSavingAttendance(true);
+        try {
+            const res = await fetch(`http://localhost:5000/api/session/${attendanceTarget.id}/status`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    mentor_id: mentorId,
+                    status: attendanceStatus,
+                    absence_reason: attendanceStatus === "Absent" ? absenceReason.trim() : "",
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success(attendanceStatus === "Attended" ? "Attendance marked present" : "Attendance marked absent");
+                setAttendanceTarget(null);
+                setAbsenceReason("");
+                fetchSessions();
+            } else {
+                toast.error(data.message || "Failed to update attendance");
+            }
+        } catch {
+            toast.error("Network error");
+        } finally {
+            setSavingAttendance(false);
+        }
+    };
+
+    const now = new Date();
+    const pending  = sessions.filter(s => s.status === "Pending");
+    // Upcoming: Approved sessions whose time has NOT yet passed
+    const upcoming = sessions.filter(s => s.status === "Approved" && getSessionDateTime(s.date, s.time_slot) > now);
+    // History: Attended, Absent, Rejected, Cancelled OR Approved sessions whose time HAS passed
+    const history  = sessions.filter(s =>
+        ["Attended", "Absent", "Rejected", "Cancelled"].includes(s.status) ||
+        (s.status === "Approved" && getSessionDateTime(s.date, s.time_slot) <= now)
+    );
+
+    const SessionCard = ({ s, isHistory = false }: { s: Session; isHistory?: boolean }) => {
         const d = new Date(s.date + "T00:00:00");
         const hasRescheduleReq = isRescheduleRequest(s.notes);
-
+        const sessionTime = getSessionDateTime(s.date, s.time_slot);
+        const hasPassed = new Date() > sessionTime;
+        const canMarkAttendance = s.status === "Approved" && hasPassed;
         return (
-            <div className="p-4 rounded-xl border border-border bg-card hover:bg-muted/20 transition-colors">
+            <div className={`p-5 rounded-2xl border bg-white transition-all hover:shadow-md ${
+                canMarkAttendance ? "border-amber-200 shadow-amber-50" :
+                s.status === "Attended" ? "border-indigo-100" :
+                s.status === "Absent" ? "border-rose-100" :
+                "border-slate-100"
+            }`}>
                 <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                     {/* Date Block */}
-                    <div className="flex-none text-center w-16 bg-primary/5 rounded-lg p-2 border border-primary/10 shrink-0">
-                        <p className="text-[10px] font-bold uppercase text-muted-foreground">{d.toLocaleDateString("en-IN", { month: "short" })}</p>
-                        <p className="text-xl font-black text-primary">{d.getDate()}</p>
-                        <p className="text-[10px] text-muted-foreground">{d.toLocaleDateString("en-IN", { weekday: "short" })}</p>
+                    <div className={`flex-none text-center w-20 rounded-2xl p-3 border shrink-0 ${
+                        canMarkAttendance ? "bg-amber-50 border-amber-100" :
+                        s.status === "Attended" ? "bg-indigo-50 border-indigo-100" :
+                        s.status === "Absent" ? "bg-rose-50 border-rose-100" :
+                        "bg-slate-50 border-slate-100"
+                    }`}>
+                        <p className="text-[10px] font-black uppercase text-slate-400">{d.toLocaleDateString("en-IN", { month: "short" })}</p>
+                        <p className={`text-2xl font-black leading-tight ${
+                            canMarkAttendance ? "text-amber-600" :
+                            s.status === "Attended" ? "text-indigo-600" :
+                            s.status === "Absent" ? "text-rose-600" :
+                            "text-slate-700"
+                        }`}>{d.getDate()}</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase">{d.toLocaleDateString("en-IN", { weekday: "short" })}</p>
                     </div>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap gap-2 items-center mb-1">
-                            <span className="font-semibold text-sm">{FMT_TIME(s.time_slot)}</span>
-                            <Badge variant="outline" className="text-xs">
+                        <div className="flex flex-wrap gap-2 items-center mb-2">
+                            <span className="font-black text-slate-800 text-lg">{FMT_TIME(s.time_slot)}</span>
+                            <Badge className="bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-lg border-none text-[10px]">
                                 {s.session_type === "Online" ? <Video className="h-3 w-3 mr-1" /> : <MapPin className="h-3 w-3 mr-1" />}
-                                {s.session_type}
+                                {s.session_type.toUpperCase()}
                             </Badge>
-                            {s.slot_type === "mentor" && <Badge variant="outline" className="text-xs border-blue-200 text-blue-700">Evening</Badge>}
-                            <Badge className={`text-xs border ${STATUS_COLORS[s.status] || ""}`}>{s.status}</Badge>
+                            {s.slot_type === "mentor" && <Badge className="bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded-lg border border-indigo-100 text-[10px]">EVENING</Badge>}
+                            <Badge className={`text-[10px] font-black uppercase tracking-wide border px-2 py-0.5 rounded-full ${STATUS_COLORS[s.status] || ""}`}>{s.status}</Badge>
                             {hasRescheduleReq && (
-                                <Badge className="text-xs bg-blue-100 text-blue-800 border border-blue-200">
-                                    <RefreshCw className="h-3 w-3 mr-1" /> Reschedule Requested
+                                <Badge className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 font-bold">
+                                    <RefreshCw className="h-3 w-3 mr-1" /> Reschedule Req
+                                </Badge>
+                            )}
+                            {canMarkAttendance && (
+                                <Badge className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 font-black animate-pulse">
+                                    ⏰ Awaiting Attendance
                                 </Badge>
                             )}
                         </div>
 
-                        <p className="text-sm font-semibold">{s.student_name} <span className="text-xs font-mono text-muted-foreground">({s.student_id})</span></p>
+                        <p className="text-base font-black text-slate-800">{s.student_name} <span className="text-xs font-mono text-slate-400 font-normal">({s.student_id})</span></p>
 
                         {s.notes && (
-                            <div className="mt-1">
+                            <div className="mt-2">
                                 {hasRescheduleReq ? (
-                                    <div className="text-xs bg-blue-50 border border-blue-200 rounded p-2 text-blue-800 space-y-0.5">
-                                        <p className="font-semibold flex items-center gap-1"><RefreshCw className="h-3 w-3" /> Reschedule Request Details:</p>
+                                    <div className="text-xs bg-blue-50 border border-blue-100 rounded-xl p-3 text-blue-800 space-y-0.5">
+                                        <p className="font-black flex items-center gap-1"><RefreshCw className="h-3 w-3" /> Reschedule Request:</p>
                                         {s.notes.split('\n').filter(Boolean).map((line, i) => (
-                                            <p key={i} className="text-blue-700">{line}</p>
+                                            <p key={i} className="text-blue-700 font-semibold">{line}</p>
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-xs italic text-muted-foreground">"{s.notes}"</p>
+                                    <div className="bg-slate-50 rounded-xl border border-slate-100 p-3">
+                                        <p className="text-xs font-bold text-slate-600 italic">"{s.notes}"</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Post-session attendance buttons */}
+                        {canMarkAttendance && (
+                            <div className="mt-4 p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                                <p className="text-xs font-black text-amber-700 uppercase tracking-wider mb-3">⏰ Session Time Passed — Record Attendance</p>
+                                <div className="flex gap-2">
+                                    <Button
+                                        size="sm"
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs shadow-md"
+                                        disabled={savingAttendance}
+                                        onClick={() => openAttendanceDialog(s, "Attended")}
+                                    >
+                                        {savingAttendance && attendanceTarget?.id === s.id && attendanceStatus === "Attended"
+                                            ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                            : <CheckCircle className="h-3 w-3 mr-1" />}
+                                        Mark Attended
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-rose-200 text-rose-600 hover:bg-rose-50 font-black rounded-xl text-xs"
+                                        disabled={savingAttendance}
+                                        onClick={() => openAttendanceDialog(s, "Absent")}
+                                    >
+                                        {savingAttendance && attendanceTarget?.id === s.id && attendanceStatus === "Absent"
+                                            ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                            : <XCircle className="h-3 w-3 mr-1" />}
+                                        Mark Absent
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        {s.status === "Attended" && (
+                            <div className="mt-2 flex items-center gap-2 bg-indigo-50 rounded-xl border border-indigo-100 px-4 py-2">
+                                <CheckCircle className="h-4 w-4 text-indigo-500" />
+                                <span className="text-xs font-black text-indigo-700 uppercase tracking-wider">Session Completed — Attended</span>
+                            </div>
+                        )}
+                        {s.status === "Absent" && (
+                            <div className="mt-2 bg-rose-50 rounded-xl border border-rose-100 px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                    <XCircle className="h-4 w-4 text-rose-500" />
+                                    <span className="text-xs font-black text-rose-700 uppercase tracking-wider">Student Was Absent</span>
+                                </div>
+                                {s.absence_reason && (
+                                    <p className="mt-2 text-xs text-rose-800 font-medium">Reason: {s.absence_reason}</p>
                                 )}
                             </div>
                         )}
@@ -458,15 +638,62 @@ export default function MentorSessionsPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-start gap-2 flex-wrap sm:flex-nowrap shrink-0">
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
                         {s.status === "Pending" && (
-                            <Button size="sm" variant="outline" className="text-xs" onClick={() => setRespondTarget(s)}>
-                                Respond
-                            </Button>
+                            <>
+                                <Button size="sm" variant="outline" className="text-xs font-black" onClick={() => setNoteTarget(s)}>
+                                    Private Note
+                                </Button>
+                                <Button size="sm" variant="outline" className="text-xs font-black border-yellow-200 text-yellow-600 hover:bg-yellow-50" onClick={() => setRespondTarget(s)}>
+                                    Respond
+                                </Button>
+                            </>
                         )}
                         {s.status === "Approved" && (
-                            <Button size="sm" variant="ghost" className="text-xs text-destructive hover:bg-destructive/10" onClick={() => setRespondTarget(s)}>
-                                Cancel
+                            <>
+                                <Button size="sm" variant="outline" className="text-xs font-black" onClick={() => setNoteTarget(s)}>
+                                    Private Note
+                                </Button>
+                                {(() => {
+                                    // Parse time e.g. "12:00" or range
+                                    const timeStr = (s.time_slot || "00:00").split('-')[0].trim();
+                                    const [h, m] = timeStr.split(':').map(Number);
+                                    const sessionTime = new Date(s.date + "T" + String(h).padStart(2, '0') + ":" + String(m || 0).padStart(2, '0') + ":00");
+                                    const now = new Date();
+                                    const hasPassed = now > sessionTime;
+
+                                    if (hasPassed) {
+                                        return (
+                                            <div className="flex gap-2">
+                                                <Button 
+                                                    size="sm" 
+                                                    className="text-[10px] font-black bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                    onClick={() => openAttendanceDialog(s, "Attended")}
+                                                >
+                                                    Mark Attended
+                                                </Button>
+                                                <Button 
+                                                    size="sm" 
+                                                    variant="outline"
+                                                    className="text-[10px] font-black border-red-200 text-red-600 hover:bg-red-50"
+                                                    onClick={() => openAttendanceDialog(s, "Absent")}
+                                                >
+                                                    Mark Absent
+                                                </Button>
+                                            </div>
+                                        );
+                                    }
+                                    return (
+                                        <Button size="sm" variant="ghost" className="text-xs text-red-500 font-bold hover:bg-red-50" onClick={() => setRespondTarget(s)}>
+                                            Cancel Session
+                                        </Button>
+                                    );
+                                })()}
+                            </>
+                        )}
+                        {isHistory && s.status !== "Approved" && (
+                            <Button size="sm" variant="outline" className="text-xs font-black" onClick={() => setNoteTarget(s)}>
+                                Private Note
                             </Button>
                         )}
                     </div>
@@ -544,51 +771,53 @@ export default function MentorSessionsPage() {
                 </motion.div>
 
                 {/* Stats */}
-                <motion.div {...anim(1)} className="grid grid-cols-3 gap-4">
+                <motion.div {...anim(1)} className="grid grid-cols-4 gap-4">
                     {[
-                        { label: "Pending",  value: pending.length,  color: "text-yellow-600", bg: "border-l-yellow-400" },
-                        { label: "Upcoming", value: upcoming.length, color: "text-green-600",  bg: "border-l-green-400"  },
-                        { label: "Past",     value: past.length,     color: "text-gray-500",   bg: "border-l-gray-300"   },
+                        { label: "Pending",  value: pending.length,  color: "text-amber-600",  bg: "border-l-amber-400",   icon: "⏳" },
+                        { label: "Upcoming", value: upcoming.length, color: "text-emerald-600", bg: "border-l-emerald-400",  icon: "📅" },
+                        { label: "History",  value: history.length,  color: "text-indigo-600",  bg: "border-l-indigo-400",  icon: "📋" },
+                        { label: "Total",    value: sessions.length, color: "text-slate-700",   bg: "border-l-slate-400",   icon: "🔢" },
                     ].map(stat => (
-                        <Card key={stat.label} className={`border-l-4 ${stat.bg}`}>
+                        <Card key={stat.label} className={`border-l-4 ${stat.bg} shadow-sm`}>
                             <CardContent className="p-4">
-                                <p className="text-xs uppercase text-muted-foreground font-semibold tracking-wider">{stat.label}</p>
+                                <p className="text-[10px] uppercase text-slate-400 font-black tracking-[0.15em]">{stat.icon} {stat.label}</p>
                                 <p className={`text-3xl font-black mt-1 ${stat.color}`}>{stat.value}</p>
                             </CardContent>
                         </Card>
                     ))}
                 </motion.div>
 
-                <Tabs defaultValue="pending">
-                    <TabsList>
-                        <TabsTrigger value="pending">Pending ({pending.length})</TabsTrigger>
-                        <TabsTrigger value="upcoming">Upcoming ({upcoming.length})</TabsTrigger>
-                        <TabsTrigger value="past">Past</TabsTrigger>
-                        <TabsTrigger value="leaves">My Leaves</TabsTrigger>
+                <Tabs defaultValue="pending" className="mt-2">
+                    <TabsList className="bg-slate-100 p-1 rounded-2xl">
+                        <TabsTrigger value="pending" className="rounded-xl font-bold">⏳ Pending ({pending.length})</TabsTrigger>
+                        <TabsTrigger value="upcoming" className="rounded-xl font-bold">📅 Upcoming ({upcoming.length})</TabsTrigger>
+                        <TabsTrigger value="history" className="rounded-xl font-bold">📋 History ({history.length})</TabsTrigger>
+                        <TabsTrigger value="leaves" className="rounded-xl font-bold">🟡 My Leaves</TabsTrigger>
                     </TabsList>
 
                     {[
-                        { key: "pending",  list: pending  },
-                        { key: "upcoming", list: upcoming },
-                        { key: "past",     list: past     },
+                        { key: "pending",  list: pending,  label: "pending" },
+                        { key: "upcoming", list: upcoming, label: "upcoming" },
+                        { key: "history",  list: history,  label: "history",  isHistory: true },
                     ].map(tab => (
                         <TabsContent key={tab.key} value={tab.key} className="mt-4">
                             {sessionsLoading ? (
-                                <div className="flex items-center gap-2 text-muted-foreground p-6">
-                                    <Loader2 className="h-5 w-5 animate-spin" /> Loading…
+                                <div className="flex items-center gap-3 text-slate-400 font-bold p-10 justify-center">
+                                    <Loader2 className="h-6 w-6 animate-spin" /> Loading sessions…
                                 </div>
                             ) : tab.list.length === 0 ? (
-                                <Card>
-                                    <CardContent className="p-12 text-center text-muted-foreground">
-                                        <Calendar className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                                        No {tab.key} sessions.
+                                <Card className="border-slate-100 shadow-sm rounded-2xl">
+                                    <CardContent className="p-16 text-center">
+                                        <Calendar className="h-14 w-14 mx-auto mb-4 text-slate-200" />
+                                        <p className="text-slate-500 font-black text-lg">No {tab.label} sessions</p>
+                                        <p className="text-slate-400 font-bold text-sm mt-1">Everything is up to date.</p>
                                     </CardContent>
                                 </Card>
                             ) : (
                                 <div className="space-y-3">
                                     {tab.list.map((s, i) => (
                                         <motion.div key={s.id} {...anim(i)}>
-                                            <SessionCard s={s} />
+                                            <SessionCard s={s} isHistory={tab.isHistory} />
                                         </motion.div>
                                     ))}
                                 </div>
@@ -764,6 +993,117 @@ export default function MentorSessionsPage() {
                                 Cancel Session
                             </Button>
                         )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!noteTarget} onOpenChange={v => {
+                if (!v) {
+                    setNoteTarget(null);
+                    setPrivateNoteContent("");
+                    setPrivateNoteType("session");
+                }
+            }}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Private Mentor Note</DialogTitle>
+                        {noteTarget && (
+                            <DialogDescription>
+                                <strong>{noteTarget.student_name}</strong> ({noteTarget.student_id}) on{" "}
+                                <strong>{new Date(noteTarget.date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</strong>{" "}
+                                at <strong>{FMT_TIME(noteTarget.time_slot)}</strong>. This note stays private to the mentor until the student is moved into alumni.
+                            </DialogDescription>
+                        )}
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-1">
+                        <div>
+                            <Label className="text-xs">Note Type</Label>
+                            <Select value={privateNoteType} onValueChange={setPrivateNoteType}>
+                                <SelectTrigger className="mt-1">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="session">Session Record</SelectItem>
+                                    <SelectItem value="private">Private Follow-up</SelectItem>
+                                    <SelectItem value="abnormality">Abnormality</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <Label className="text-xs">Confidential Note</Label>
+                            <Textarea
+                                value={privateNoteContent}
+                                onChange={(e) => setPrivateNoteContent(e.target.value)}
+                                placeholder="Record the mentoring session, abnormality, or mentor-only follow-up details..."
+                                className="mt-1 min-h-[140px]"
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setNoteTarget(null)} disabled={savingPrivateNote}>
+                            Close
+                        </Button>
+                        <Button className="bg-mentor hover:bg-mentor/90 text-white" onClick={handleSavePrivateNote} disabled={savingPrivateNote}>
+                            {savingPrivateNote ? "Saving..." : "Save Note"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!attendanceTarget} onOpenChange={v => {
+                if (!v) {
+                    setAttendanceTarget(null);
+                    setAbsenceReason("");
+                    setAttendanceStatus("Attended");
+                }
+            }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {attendanceStatus === "Attended" ? "Mark Attendance Present" : "Mark Attendance Absent"}
+                        </DialogTitle>
+                        {attendanceTarget && (
+                            <DialogDescription>
+                                <strong>{attendanceTarget.student_name}</strong> ({attendanceTarget.student_id}) on{" "}
+                                <strong>{new Date(attendanceTarget.date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</strong>{" "}
+                                at <strong>{FMT_TIME(attendanceTarget.time_slot)}</strong>
+                            </DialogDescription>
+                        )}
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-1">
+                        {attendanceStatus === "Absent" ? (
+                            <div>
+                                <Label className="text-xs">Reason for Absence</Label>
+                                <Textarea
+                                    value={absenceReason}
+                                    onChange={(e) => setAbsenceReason(e.target.value)}
+                                    placeholder="Enter why the student was absent..."
+                                    className="mt-1 min-h-[120px]"
+                                />
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                This will mark the session as attended and move it into the past meetings history.
+                            </p>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setAttendanceTarget(null)} disabled={savingAttendance}>
+                            Close
+                        </Button>
+                        <Button
+                            className={attendanceStatus === "Attended" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
+                            variant={attendanceStatus === "Absent" ? "destructive" : "default"}
+                            onClick={handleSubmitAttendance}
+                            disabled={savingAttendance}
+                        >
+                            {savingAttendance ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            {attendanceStatus === "Attended" ? "Confirm Present" : "Confirm Absent"}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

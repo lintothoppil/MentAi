@@ -1,542 +1,530 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import {
-    LayoutDashboard, BarChart3, Calendar, FileText, Bell,
-    Upload, Brain, Users, Send, Loader2, Sparkles, BookOpen,
-    RefreshCw, Zap, MessageSquare, TrendingUp, TrendingDown,
-    Minus, AlertTriangle, CheckCircle2, Info, Lightbulb, X,
+    AlertTriangle, Bell, BookOpen, Brain, Calendar, CheckCircle2,
+    FileText, LayoutDashboard, Loader2, RefreshCw, Sparkles, Target,
+    TrendingUp, Users, Zap,
 } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent } from "@/components/ui/card";
+import SmartStudyPlanner from "@/components/dashboards/SmartStudyPlanner";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import ReactMarkdown from "react-markdown";
+import { toast } from "sonner";
 
-// ─── nav ───────────────────────────────────────────────────────────
+const BASE = "http://localhost:5000";
+
 const navItems = [
-    { label: "Overview",      icon: <LayoutDashboard className="h-4 w-4" />, path: "/dashboard/student" },
-    { label: "Academics",     icon: <BarChart3 className="h-4 w-4" />,       path: "/dashboard/student/academics" },
-    { label: "AI Insights",   icon: <Brain className="h-4 w-4" />,           path: "/dashboard/student/insights" },
-    { label: "Timetable",     icon: <Calendar className="h-4 w-4" />,        path: "/dashboard/student/timetable" },
-    { label: "Mentoring",     icon: <Users className="h-4 w-4" />,           path: "/dashboard/student/mentoring" },
-    { label: "Requests",      icon: <FileText className="h-4 w-4" />,        path: "/dashboard/student/requests" },
-    { label: "Certificates",  icon: <Upload className="h-4 w-4" />,          path: "/dashboard/student/certificates" },
-    { label: "Notifications", icon: <Bell className="h-4 w-4" />,            path: "/dashboard/student/notifications" },
+    { label: "Overview", icon: <LayoutDashboard className="h-4 w-4" />, path: "/dashboard/student" },
+    { label: "Academics", icon: <TrendingUp className="h-4 w-4" />, path: "/dashboard/student/academics" },
+    { label: "AI Insights", icon: <Brain className="h-4 w-4" />, path: "/dashboard/student/insights" },
+    { label: "Timetable", icon: <Calendar className="h-4 w-4" />, path: "/dashboard/student/timetable" },
+    { label: "Mentoring", icon: <Users className="h-4 w-4" />, path: "/dashboard/student/mentoring" },
+    { label: "Requests", icon: <FileText className="h-4 w-4" />, path: "/dashboard/student/requests" },
+    { label: "Certificates", icon: <BookOpen className="h-4 w-4" />, path: "/dashboard/student/certificates" },
+    { label: "Notifications", icon: <Bell className="h-4 w-4" />, path: "/dashboard/student/notifications" },
 ];
 
-// ─── types ─────────────────────────────────────────────────────────
-interface InsightCard { title: string; body: string; type: string; icon: string }
-interface ChatMsg      { role: "user" | "assistant"; content: string; ts: Date }
+interface InsightCard {
+    title: string;
+    body: string;
+    type: string;
+    icon: string;
+}
 
-// ─── card theme map ────────────────────────────────────────────────
-const THEMES: Record<string, { grad: string; glow: string; iconComp: typeof AlertTriangle; text: string }> = {
-    warning: { grad: "from-red-500/15 to-orange-500/10",  glow: "shadow-red-500/10",    iconComp: AlertTriangle,  text: "text-red-400" },
-    success: { grad: "from-emerald-500/15 to-green-500/10", glow: "shadow-emerald-500/10", iconComp: CheckCircle2, text: "text-emerald-400" },
-    info:    { grad: "from-blue-500/15 to-cyan-500/10",    glow: "shadow-blue-500/10",   iconComp: Info,           text: "text-blue-400" },
-    tip:     { grad: "from-purple-500/15 to-violet-500/10", glow: "shadow-purple-500/10", iconComp: Lightbulb,     text: "text-purple-400" },
-};
+interface FailedSubject {
+    subject: string;
+    mark?: number | null;
+    attendance_pct?: number | null;
+    handler_id?: number | null;
+    handler_name: string;
+    class_slots: string[];
+    notes_available: number;
+    recommended_hours: number;
+    quick_fix: string;
+    pass_strategy: string[];
+}
 
-const QUICK = [
-    "📊 How are my marks?",
-    "📅 Give me a weekly plan",
-    "⚠️ What's my risk level?",
-    "📈 How to improve attendance?",
-    "🎯 Which subject needs focus?",
-    "💡 Top 3 study tips for me",
-];
+interface SupportNote {
+    id: number;
+    subject: string;
+    title: string;
+    description?: string;
+    download_url?: string | null;
+    uploaded_by_name?: string;
+}
 
-const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
-    openai:       { label: "GPT-4o mini",      color: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" },
-    gemini:       { label: "Gemini Flash",      color: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
-    "rule-based": { label: "Smart Analysis",    color: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
-};
+interface SupportReport {
+    student_name: string;
+    summary: {
+        overall_score: number;
+        overall_status: string;
+        attendance_pct: number;
+        avg_marks: number;
+        cgpa?: number | null;
+        planner_score: number;
+        planner_status: string;
+        completed_sessions: number;
+        skipped_sessions: number;
+        planned_sessions: number;
+        failed_subject_count: number;
+        available_note_count: number;
+    };
+    failed_subjects: FailedSubject[];
+    improving_areas: { title: string; detail: string }[];
+    attention_areas: { title: string; detail: string }[];
+    ongoing_areas: { title: string; detail: string }[];
+    recommended_actions: string[];
+    available_notes: SupportNote[];
+    upcoming_remedials: {
+        id: number;
+        subject: string;
+        title: string;
+        scheduled_date: string;
+        time_slot: string;
+        mode: string;
+        meeting_link?: string;
+        handler_name: string;
+    }[];
+    attendance_alert?: string;
+    focus_now?: { subject: string; reason: string; action_today: string }[];
+    today_plan?: { time: string; subject: string; type: string; tasks: string[] }[];
+    weak_subjects_strategy?: { subject: string; problem: string; solution: string }[];
+    failure_analysis?: { subject: string; reason: string; fix: string }[];
+    behavior_correction?: string;
+    motivation?: string;
+}
 
-const fade = (i = 0) => ({
-    initial: { opacity: 0, y: 20 },
+const fade = (delay = 0) => ({
+    initial: { opacity: 0, y: 12 },
     animate: { opacity: 1, y: 0 },
-    transition: { delay: i * 0.07, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] },
+    transition: { delay, duration: 0.3 },
 });
 
-// ═══════════════════════════════════════════════════════════════════
+const cardTone: Record<string, string> = {
+    warning: "border-l-red-500 bg-red-50/70",
+    success: "border-l-emerald-500 bg-emerald-50/70",
+    info: "border-l-blue-500 bg-blue-50/70",
+    tip: "border-l-purple-500 bg-purple-50/70",
+};
+
 export default function StudentInsightsPage() {
-    const user  = JSON.parse(localStorage.getItem("user") || "{}");
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
     const admNo = user.admission_number || "";
     const firstName = user.name?.split(" ")[0] || "there";
 
-    // states
-    const [cards, setCards]               = useState<InsightCard[]>([]);
-    const [cardsLoading, setCardsLoading] = useState(true);
-    const [source, setSource]             = useState("");
-    const [messages, setMessages]         = useState<ChatMsg[]>([]);
-    const [input, setInput]               = useState("");
-    const [chatLoading, setChatLoading]   = useState(false);
-    const [plan, setPlan]                 = useState("");
-    const [planLoading, setPlanLoading]   = useState(false);
-    const [planSource, setPlanSource]     = useState("");
-    const [planOpen, setPlanOpen]         = useState(false);
-    const [expandCard, setExpandCard]     = useState<number | null>(null);
-    const chatEnd = useRef<HTMLDivElement>(null);
+    const [cards, setCards] = useState<InsightCard[]>([]);
+    const [report, setReport] = useState<SupportReport | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [preferredDate, setPreferredDate] = useState("");
+    const [preferredTime, setPreferredTime] = useState("18:30");
 
-    // fetch insights
-    const fetchInsights = useCallback(async () => {
+    const loadAll = useCallback(async (showRefresh = false) => {
         if (!admNo) return;
-        setCardsLoading(true);
+        if (showRefresh) setRefreshing(true);
+        else setLoading(true);
+
         try {
-            const r = await fetch(`http://localhost:5000/api/ai/insights/${admNo}`);
-            const d = await r.json();
-            if (d.success) { setCards(d.data); setSource(d.source); }
-        } catch { /* silent */ }
-        finally { setCardsLoading(false); }
+            const [insightsRes, reportRes] = await Promise.all([
+                fetch(`${BASE}/api/ai/insights/${admNo}`),
+                fetch(`${BASE}/api/student/support-report/${admNo}`),
+            ]);
+            const [insightsData, reportData] = await Promise.all([insightsRes.json(), reportRes.json()]);
+
+            if (insightsData.success) setCards(insightsData.data || []);
+            if (reportData.success) setReport(reportData.data || null);
+        } catch {
+            toast.error("Couldn't load the latest student support report");
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
     }, [admNo]);
 
-    useEffect(() => { fetchInsights(); }, [fetchInsights]);
-
-    // scroll chat
-    useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-
-    // welcome
     useEffect(() => {
-        if (!admNo) return;
-        setMessages([{
-            role: "assistant",
-            content: `Hi **${firstName}**! 👋 I'm **MentorAI**, your personal academic advisor.\n\nI have real-time access to your attendance, marks, risk score, and study plan. Ask me anything — or tap a quick question below!`,
-            ts: new Date(),
-        }]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [admNo]);
+        loadAll();
+    }, [loadAll]);
 
-    // send message
-    const sendMsg = async (text?: string) => {
-        const msg = (text || input).trim();
-        if (!msg || chatLoading) return;
-        setInput("");
-        setMessages(prev => [...prev, { role: "user", content: msg, ts: new Date() }]);
-        setChatLoading(true);
+    const requestSupport = async (subject: FailedSubject, actionType: "session_request" | "notes_request") => {
+        if (!subject.handler_id) {
+            toast.error("No subject handler is mapped for this subject yet");
+            return;
+        }
+
+        const actionKey = `${actionType}-${subject.subject}`;
+        setActionLoading(actionKey);
         try {
-            const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
-            const r = await fetch("http://localhost:5000/api/ai/chat", {
+            const res = await fetch(`${BASE}/api/student/support-actions/${admNo}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ admission_number: admNo, message: msg, history }),
+                body: JSON.stringify({
+                    action_type: actionType,
+                    subject: subject.subject,
+                    handler_id: subject.handler_id,
+                    preferred_date: actionType === "session_request" ? preferredDate : "",
+                    preferred_time: actionType === "session_request" ? preferredTime : "",
+                }),
             });
-            const d = await r.json();
-            if (d.success) setMessages(p => [...p, { role: "assistant", content: d.reply, ts: new Date() }]);
-        } catch {
-            setMessages(p => [...p, { role: "assistant", content: "Connection error. Please try again.", ts: new Date() }]);
-        } finally { setChatLoading(false); }
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message || "Request failed");
+            toast.success(data.message || "Support request sent");
+            loadAll(true);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Support request failed");
+        } finally {
+            setActionLoading(null);
+        }
     };
 
-    // generate plan
-    const genPlan = async () => {
-        if (!admNo || planLoading) return;
-        setPlanLoading(true);
-        setPlanOpen(true);
-        setPlan("");
-        try {
-            const r = await fetch(`http://localhost:5000/api/ai/study-plan/${admNo}`);
-            const d = await r.json();
-            if (d.success) { setPlan(d.plan); setPlanSource(d.source); }
-        } catch { setPlan("Failed to generate. Please try again."); }
-        finally { setPlanLoading(false); }
-    };
-
-    const srcInfo = SOURCE_LABELS[source] || SOURCE_LABELS["rule-based"];
-    const planInfo = SOURCE_LABELS[planSource] || SOURCE_LABELS["rule-based"];
+    const summaryCards = useMemo(() => {
+        if (!report) return [];
+        return [
+            { label: "Recovery Score", value: `${report.summary.overall_score}/100`, tone: "text-indigo-700" },
+            { label: "Current CGPA", value: report.summary.cgpa ? report.summary.cgpa.toFixed(2) : "—", tone: "text-emerald-700" },
+            { label: "Failed Subjects", value: String(report.summary.failed_subject_count), tone: "text-red-700" },
+            { label: "Planner Score", value: `${report.summary.planner_score}/100`, tone: "text-amber-700" },
+        ];
+    }, [report]);
 
     return (
         <DashboardLayout role="student" roleLabel="Student Dashboard" navItems={navItems} gradientClass="gradient-student">
-            <div className="space-y-6 pb-8">
-
-                {/* ══════════ HERO ══════════════════════════════════ */}
+            <div className="space-y-6 pb-6">
                 <motion.div {...fade(0)}>
-                    <div className="relative overflow-hidden rounded-3xl p-8 text-white"
-                        style={{ background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 30%, #4338ca 60%, #6d28d9 100%)" }}>
-                        {/* animated orbs */}
-                        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-                            <motion.div
-                                className="absolute -top-20 -right-20 h-72 w-72 rounded-full bg-violet-400/20 blur-3xl"
-                                animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.7, 0.4] }}
-                                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                            />
-                            <motion.div
-                                className="absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-indigo-400/20 blur-3xl"
-                                animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.6, 0.3] }}
-                                transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-                            />
-                            <motion.div
-                                className="absolute top-1/2 left-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-300/10 blur-2xl"
-                                animate={{ rotate: [0, 360] }}
-                                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                            />
-                        </div>
-
-                        <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex items-center gap-4">
-                                <motion.div
-                                    className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm shadow-2xl"
-                                    animate={{ rotate: [0, 5, -5, 0] }}
-                                    transition={{ duration: 4, repeat: Infinity }}
-                                >
-                                    <Brain className="h-9 w-9 text-white" />
-                                </motion.div>
+                    <div className="rounded-3xl p-6 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                        style={{ background: "linear-gradient(135deg, #0F2A44 0%, #1b3555 100%)" }}>
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-3">
+                                <div className="h-11 w-11 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
+                                    <Brain className="h-5 w-5" />
+                                </div>
                                 <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h1 className="text-3xl font-black tracking-tight">AI Insights</h1>
-                                        {source && (
-                                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${srcInfo.color}`}>
-                                                ✦ {srcInfo.label}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="text-white/70 text-sm">
-                                        Personalised intelligence — powered by your real academic data
-                                    </p>
+                                    <h1 className="text-2xl font-black">Student Recovery Insights</h1>
+                                    <p className="text-white/75 text-sm">Hi {firstName}, this report is built from your real marks, attendance, CGPA, and study-plan activity.</p>
                                 </div>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                                <Button
-                                    onClick={fetchInsights}
-                                    disabled={cardsLoading}
-                                    variant="ghost"
-                                    className="bg-white/10 hover:bg-white/20 text-white border-0 gap-2 backdrop-blur-sm"
-                                >
-                                    {cardsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                                    Refresh
-                                </Button>
-                                <Button
-                                    onClick={genPlan}
-                                    disabled={planLoading}
-                                    className="bg-white text-indigo-700 hover:bg-white/90 font-bold gap-2 shadow-xl"
-                                >
-                                    {planLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-                                    Generate Study Plan
-                                </Button>
-                            </div>
+                            {report && (
+                                <Badge className="bg-white/15 text-white hover:bg-white/15 border-0 w-fit">
+                                    {report.summary.overall_status}
+                                </Badge>
+                            )}
                         </div>
-
-                        {/* stat pills */}
-                        <motion.div
-                            className="relative z-10 mt-6 flex flex-wrap gap-2"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.5 }}
-                        >
-                            {[
-                                { label: "AI Chat", emoji: "💬", hint: "Multi-turn Q&A" },
-                                { label: "Auto Insights", emoji: "⚡", hint: "4 personalised cards" },
-                                { label: "Study Planner", emoji: "📅", hint: "7-day AI plan" },
-                                { label: "Context-Aware", emoji: "🎯", hint: "Uses your real data" },
-                            ].map(p => (
-                                <div key={p.label} className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium backdrop-blur-sm">
-                                    <span>{p.emoji}</span>
-                                    <span>{p.label}</span>
-                                    <span className="text-white/50">· {p.hint}</span>
-                                </div>
-                            ))}
-                        </motion.div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => loadAll(true)}
+                                disabled={refreshing}
+                                className="bg-white/10 hover:bg-white/20 text-white border-0"
+                            >
+                                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+                                Refresh
+                            </Button>
+                        </div>
                     </div>
                 </motion.div>
 
-                {/* ══════════ INSIGHT CARDS ════════════════════════ */}
-                <div>
-                    <motion.div {...fade(1)} className="flex items-center justify-between mb-4">
-                        <h2 className="flex items-center gap-2 text-base font-bold">
-                            <Sparkles className="h-4 w-4 text-indigo-500" />
-                            Your Personalised Insights
-                        </h2>
-                        {source && !cardsLoading && (
-                            <span className="text-xs text-muted-foreground">
-                                Generated by {srcInfo.label}
-                            </span>
-                        )}
-                    </motion.div>
-
-                    {cardsLoading ? (
-                        <div className="grid sm:grid-cols-2 gap-4">
-                            {[0,1,2,3].map(i => (
-                                <motion.div key={i} {...fade(i)} className="h-40 rounded-2xl bg-muted animate-pulse" />
+                {loading ? (
+                    <Card className="rounded-3xl border-dashed">
+                        <CardContent className="py-16 text-center text-slate-500">
+                            <Loader2 className="h-8 w-8 mx-auto mb-3 animate-spin" />
+                            Loading your support report...
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                            {summaryCards.map((item, index) => (
+                                <motion.div key={item.label} {...fade(index * 0.04)}>
+                                    <Card className="rounded-2xl border shadow-sm">
+                                        <CardContent className="p-5">
+                                            <p className="text-xs uppercase tracking-wide text-slate-500 font-bold">{item.label}</p>
+                                            <p className={`text-3xl font-black mt-2 ${item.tone}`}>{item.value}</p>
+                                        </CardContent>
+                                    </Card>
+                                </motion.div>
                             ))}
                         </div>
-                    ) : (
-                        <div className="grid sm:grid-cols-2 gap-4">
-                            {cards.map((card, i) => {
-                                const th  = THEMES[card.type] || THEMES.info;
-                                const Icon = th.iconComp;
-                                const open = expandCard === i;
-                                return (
-                                    <motion.div key={i} {...fade(i + 1)}>
-                                        <motion.div
-                                            className={`relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br ${th.grad}
-                                                backdrop-blur-sm shadow-lg ${th.glow} hover:shadow-xl cursor-pointer
-                                                transition-all duration-300`}
-                                            onClick={() => setExpandCard(open ? null : i)}
-                                            whileHover={{ scale: 1.02, y: -2 }}
-                                            whileTap={{ scale: 0.98 }}
-                                        >
-                                            {/* sheen */}
-                                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/5 to-transparent" />
 
-                                            <div className="relative p-5">
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10`}>
-                                                            <span className="text-xl">{card.icon}</span>
-                                                        </div>
-                                                        <div>
-                                                            <div className="flex items-center gap-2">
-                                                                <h3 className="font-bold text-sm">{card.title}</h3>
-                                                                <Badge className={`text-[9px] px-1.5 py-0 border ${card.type === 'warning' ? 'bg-red-500/20 text-red-300 border-red-400/30' : card.type === 'success' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' : card.type === 'tip' ? 'bg-purple-500/20 text-purple-300 border-purple-400/30' : 'bg-blue-500/20 text-blue-300 border-blue-400/30'}`}>
-                                                                    {card.type}
-                                                                </Badge>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <Icon className={`h-4 w-4 shrink-0 mt-0.5 ${th.text}`} />
-                                                </div>
-
-                                                <AnimatePresence>
-                                                    {!open && (
-                                                        <motion.p
-                                                            initial={{ opacity: 1 }}
-                                                            exit={{ opacity: 0 }}
-                                                            className="mt-3 text-xs text-muted-foreground leading-relaxed line-clamp-2"
-                                                        >
-                                                            {card.body}
-                                                        </motion.p>
-                                                    )}
-                                                    {open && (
-                                                        <motion.p
-                                                            initial={{ opacity: 0, height: 0 }}
-                                                            animate={{ opacity: 1, height: "auto" }}
-                                                            exit={{ opacity: 0, height: 0 }}
-                                                            className="mt-3 text-xs text-muted-foreground leading-relaxed"
-                                                        >
-                                                            {card.body}
-                                                        </motion.p>
-                                                    )}
-                                                </AnimatePresence>
-
-                                                <div className="mt-3 flex items-center gap-1 text-[10px] text-muted-foreground">
-                                                    <span>{open ? "Click to collapse" : "Click to expand"}</span>
-                                                </div>
-                                            </div>
-                                        </motion.div>
-                                    </motion.div>
-                                );
-                            })}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                            {cards.map((card, index) => (
+                                <motion.div key={`${card.title}-${index}`} {...fade(index * 0.05)}>
+                                    <Card className={`border-l-4 rounded-2xl shadow-sm ${cardTone[card.type] || cardTone.info}`}>
+                                        <CardContent className="p-4">
+                                            <p className="text-xl">{card.icon}</p>
+                                            <h3 className="font-black text-sm mt-2">{card.title}</h3>
+                                            <p className="text-sm text-slate-700 mt-1">{card.body}</p>
+                                        </CardContent>
+                                    </Card>
+                                </motion.div>
+                            ))}
                         </div>
-                    )}
-                </div>
 
-                {/* ══════════ STUDY PLAN ═══════════════════════════ */}
-                <AnimatePresence>
-                    {planOpen && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                        >
-                            <div className="rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 overflow-hidden">
-                                <div className="flex items-center justify-between p-5 border-b border-indigo-500/10">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-9 w-9 rounded-xl bg-indigo-500/20 flex items-center justify-center">
-                                            <BookOpen className="h-5 w-5 text-indigo-400" />
+                        <Card className="rounded-3xl border shadow-md">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-lg font-black">
+                                    <Sparkles className="h-5 w-5 text-indigo-600" /> Recommended next actions
+                                </CardTitle>
+                                <CardDescription>These actions are generated from your real weak areas and current plan activity.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                {(report?.recommended_actions || []).map((item, index) => (
+                                    <div key={`${item}-${index}`} className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 text-sm text-slate-700">
+                                        {item}
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+
+
+                        <div className="grid xl:grid-cols-2 gap-4">
+                            <Card className="rounded-3xl border shadow-sm">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-lg font-black">
+                                        <AlertTriangle className="h-5 w-5 text-amber-600" /> Attendance Monitor
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 text-sm text-slate-700">
+                                        {report?.attendance_alert || "Attendance alert unavailable."}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="rounded-3xl border shadow-sm">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-lg font-black">
+                                        <Zap className="h-5 w-5 text-red-600" /> Focus Now
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                    {report?.focus_now?.length ? report.focus_now.map((item, index) => (
+                                        <div key={`${item.subject}-${index}`} className="rounded-2xl border border-red-100 bg-red-50/50 p-4">
+                                            <p className="font-black text-sm">{item.subject}</p>
+                                            <p className="text-sm text-slate-700 mt-1">{item.reason}</p>
+                                            <p className="text-sm text-red-700 mt-2 font-medium">{item.action_today}</p>
                                         </div>
-                                        <div>
-                                            <h3 className="font-bold text-sm">AI-Generated Study Plan</h3>
-                                            {planSource && (
-                                                <p className="text-[11px] text-muted-foreground">
-                                                    Generated by {planInfo.label}
-                                                </p>
-                                            )}
+                                    )) : (
+                                        <p className="text-sm text-slate-500">No urgent focus items right now.</p>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <Card className="rounded-3xl border shadow-sm">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-lg font-black">
+                                    <Calendar className="h-5 w-5 text-indigo-600" /> Today's Plan
+                                </CardTitle>
+                                <CardDescription>Max 2-3 focused sessions, prioritized by current risk.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                {report?.today_plan?.length ? report.today_plan.map((item, index) => (
+                                    <div key={`${item.subject}-${item.time}-${index}`} className="rounded-2xl border p-4">
+                                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                                            <p className="font-black text-sm">{item.subject}</p>
+                                            <Badge variant="outline">{item.time}</Badge>
+                                        </div>
+                                        <p className="text-xs uppercase tracking-wide text-slate-500 font-bold mt-1">{item.type}</p>
+                                        <div className="mt-3 space-y-2">
+                                            {item.tasks.map((task, taskIndex) => (
+                                                <div key={taskIndex} className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
+                                                    {task}
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-lg" onClick={() => setPlanOpen(false)}>
-                                        <X className="h-4 w-4" />
-                                    </Button>
+                                )) : (
+                                    <p className="text-sm text-slate-500">Today's plan is not ready yet.</p>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card className="rounded-3xl border shadow-md">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-lg font-black">
+                                    <Target className="h-5 w-5 text-red-600" /> Failed subject recovery
+                                </CardTitle>
+                                <CardDescription>Backlog subjects are listed here with tips, handler support, and extra study hours to include in your week.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-xs uppercase font-bold text-slate-500 mb-2">Preferred support date</p>
+                                        <input
+                                            type="date"
+                                            value={preferredDate}
+                                            onChange={(e) => setPreferredDate(e.target.value)}
+                                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs uppercase font-bold text-slate-500 mb-2">Preferred support time</p>
+                                        <input
+                                            type="time"
+                                            value={preferredTime}
+                                            onChange={(e) => setPreferredTime(e.target.value)}
+                                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="p-5">
-                                    {planLoading ? (
-                                        <div className="flex flex-col items-center gap-4 py-10 text-muted-foreground">
-                                            <motion.div
-                                                animate={{ rotate: 360 }}
-                                                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                                            >
-                                                <Brain className="h-10 w-10 text-indigo-400" />
-                                            </motion.div>
-                                            <div className="text-center">
-                                                <p className="font-medium">Generating your personalised 7-day plan…</p>
-                                                <p className="text-xs mt-1 text-muted-foreground/70">Analysing your subjects, attendance & marks</p>
+
+                                {report?.failed_subjects.length ? report.failed_subjects.map((subject) => {
+                                    const sessionKey = `session_request-${subject.subject}`;
+                                    const notesKey = `notes_request-${subject.subject}`;
+                                    return (
+                                        <div key={subject.subject} className="rounded-3xl border border-red-100 bg-red-50/40 p-5 space-y-4">
+                                            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h3 className="text-lg font-black text-slate-900">{subject.subject}</h3>
+                                                        <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Needs pass support</Badge>
+                                                        <Badge variant="outline">{subject.recommended_hours} hrs/week</Badge>
+                                                    </div>
+                                                    <p className="text-sm text-slate-700">{subject.quick_fix}</p>
+                                                    <div className="flex flex-wrap gap-3 text-xs text-slate-500">
+                                                        <span>Mark: {subject.mark ?? "—"}</span>
+                                                        <span>Attendance: {subject.attendance_pct ?? "—"}%</span>
+                                                        <span>Handler: {subject.handler_name}</span>
+                                                    </div>
+                                                    {!!subject.class_slots.length && (
+                                                        <p className="text-xs text-slate-500">Current class slots: {subject.class_slots.join(" · ")}</p>
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-col sm:flex-row gap-2">
+                                                    <Button
+                                                        onClick={() => requestSupport(subject, "session_request")}
+                                                        disabled={actionLoading === sessionKey}
+                                                        className="bg-indigo-600 hover:bg-indigo-700"
+                                                    >
+                                                        {actionLoading === sessionKey ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                                                        Request study session
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        onClick={() => requestSupport(subject, "notes_request")}
+                                                        disabled={actionLoading === notesKey}
+                                                    >
+                                                        {actionLoading === notesKey ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                                                        Ask notes
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <div className="grid md:grid-cols-3 gap-3">
+                                                {subject.pass_strategy.map((tip, index) => (
+                                                    <div key={index} className="rounded-2xl bg-white p-3 border text-sm text-slate-700">
+                                                        {tip}
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
-                                    ) : (
-                                        <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
-                                            <ReactMarkdown>{plan}</ReactMarkdown>
+                                    );
+                                }) : (
+                                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 text-sm text-emerald-700">
+                                        No failed subjects are currently listed. Keep using the planner so weaker current-semester subjects do not become new backlogs.
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <div className="grid xl:grid-cols-3 gap-4">
+                            {[
+                                { title: "Improving", icon: <TrendingUp className="h-4 w-4 text-emerald-600" />, items: report?.improving_areas || [], tone: "border-emerald-100 bg-emerald-50/50" },
+                                { title: "Needs Attention", icon: <AlertTriangle className="h-4 w-4 text-red-600" />, items: report?.attention_areas || [], tone: "border-red-100 bg-red-50/50" },
+                                { title: "Ongoing", icon: <Zap className="h-4 w-4 text-amber-600" />, items: report?.ongoing_areas || [], tone: "border-amber-100 bg-amber-50/50" },
+                            ].map((group) => (
+                                <Card key={group.title} className={`rounded-3xl border shadow-sm ${group.tone}`}>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2 text-base font-black">{group.icon} {group.title}</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                        {group.items.length ? group.items.map((item, index) => (
+                                            <div key={`${item.title}-${index}`} className="rounded-2xl bg-white/90 p-3 border">
+                                                <p className="font-bold text-sm">{item.title}</p>
+                                                <p className="text-sm text-slate-600 mt-1">{item.detail}</p>
+                                            </div>
+                                        )) : (
+                                            <p className="text-sm text-slate-500">No items available right now.</p>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+
+                        <div className="grid xl:grid-cols-2 gap-4">
+                            <Card className="rounded-3xl border shadow-sm">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-lg font-black">
+                                        <BookOpen className="h-5 w-5 text-indigo-600" /> Notes and study material
+                                    </CardTitle>
+                                    <CardDescription>Use uploaded notes first, then ask the subject handler for more if something is still unclear.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                    {report?.available_notes.length ? report.available_notes.map((note) => (
+                                        <div key={note.id} className="rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                            <div>
+                                                <p className="font-bold text-sm">{note.title}</p>
+                                                <p className="text-xs text-slate-500 mt-1">{note.subject} · {note.uploaded_by_name || "Subject Handler"}</p>
+                                                {note.description ? <p className="text-sm text-slate-600 mt-1">{note.description}</p> : null}
+                                            </div>
+                                            {note.download_url ? (
+                                                <Button asChild variant="outline">
+                                                    <a href={`${BASE}${note.download_url}`} target="_blank" rel="noreferrer">Open note</a>
+                                                </Button>
+                                            ) : null}
+                                        </div>
+                                    )) : (
+                                        <p className="text-sm text-slate-500">No dedicated notes are available yet. Use the “Ask notes” action above for the weakest subject.</p>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            <Card className="rounded-3xl border shadow-sm">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-lg font-black">
+                                        <Calendar className="h-5 w-5 text-indigo-600" /> Upcoming remedial support
+                                    </CardTitle>
+                                    <CardDescription>Any remedial sessions already scheduled for you will appear here.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                    {report?.upcoming_remedials.length ? report.upcoming_remedials.map((item) => (
+                                        <div key={item.id} className="rounded-2xl border p-4">
+                                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                <p className="font-bold text-sm">{item.title}</p>
+                                                <Badge variant="outline">{item.subject}</Badge>
+                                            </div>
+                                            <p className="text-sm text-slate-600 mt-2">{item.scheduled_date} · {item.time_slot} · {item.mode}</p>
+                                            <p className="text-xs text-slate-500 mt-1">Handled by {item.handler_name}</p>
+                                            {item.meeting_link ? (
+                                                <Button asChild variant="outline" className="mt-3">
+                                                    <a href={item.meeting_link} target="_blank" rel="noreferrer">Open meeting link</a>
+                                                </Button>
+                                            ) : null}
+                                        </div>
+                                    )) : (
+                                        <div className="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
+                                            No remedial class is scheduled yet. Request a personalized study session from the failed subject card above.
                                         </div>
                                     )}
-                                </div>
-                            </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <motion.div {...fade(0.1)}>
+                            <SmartStudyPlanner admissionNumber={admNo} />
                         </motion.div>
-                    )}
-                </AnimatePresence>
 
-                {/* ══════════ CHAT ══════════════════════════════════ */}
-                <motion.div {...fade(5)}>
-                    <Card className="overflow-hidden border-0 shadow-2xl"
-                        style={{ background: "var(--card)" }}>
-                        {/* header */}
-                        <div className="flex items-center gap-3 border-b border-border/60 p-5"
-                            style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.04) 100%)" }}>
-                            <div className="relative">
-                                <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-                                    <MessageSquare className="h-5 w-5 text-white" />
-                                </div>
-                                <div className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-emerald-500 border-2 border-card animate-pulse" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="font-bold">Chat with MentorAI</h3>
-                                <p className="text-xs text-muted-foreground">Context-aware · Powered by your academic data</p>
-                            </div>
-                            {source && (
-                                <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full border ${srcInfo.color}`}>
-                                    {srcInfo.label}
-                                </span>
-                            )}
-                        </div>
-
-                        {/* messages */}
-                        <div className="overflow-y-auto p-5 space-y-4" style={{ height: "400px" }}>
-                            <AnimatePresence initial={false}>
-                                {messages.map((msg, i) => (
-                                    <motion.div
-                                        key={i}
-                                        initial={{ opacity: 0, y: 10, scale: 0.97 }}
-                                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                                        className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-                                    >
-                                        {/* avatar */}
-                                        {msg.role === "assistant" ? (
-                                            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 shadow-md mt-0.5">
-                                                <Brain className="h-4 w-4 text-white" />
-                                            </div>
-                                        ) : (
-                                            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center shrink-0 shadow-md mt-0.5 text-xs font-bold text-white">
-                                                {firstName.charAt(0).toUpperCase()}
-                                            </div>
-                                        )}
-
-                                        {/* bubble */}
-                                        <div className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm
-                                            ${msg.role === "user"
-                                                ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-tr-sm"
-                                                : "bg-muted/50 border border-border/50 rounded-tl-sm"}`}>
-                                            {msg.role === "assistant" ? (
-                                                <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed">
-                                                    <ReactMarkdown>{msg.content}</ReactMarkdown>
-                                                </div>
-                                            ) : (
-                                                <p className="text-sm leading-relaxed">{msg.content}</p>
-                                            )}
-                                            <p className={`text-[10px] mt-1.5 ${msg.role === "user" ? "text-white/50 text-right" : "text-muted-foreground/60"}`}>
-                                                {msg.ts.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                                            </p>
-                                        </div>
-                                    </motion.div>
-                                ))}
-                            </AnimatePresence>
-
-                            {/* typing indicator */}
-                            {chatLoading && (
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
-                                    <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0">
-                                        <Brain className="h-4 w-4 text-white" />
-                                    </div>
-                                    <div className="bg-muted/50 border border-border/50 rounded-2xl rounded-tl-sm px-5 py-3.5 flex items-center gap-1.5">
-                                        {[0, 150, 300].map(d => (
-                                            <motion.div
-                                                key={d}
-                                                className="h-2 w-2 rounded-full bg-indigo-400"
-                                                animate={{ y: [0, -5, 0] }}
-                                                transition={{ duration: 0.6, repeat: Infinity, delay: d / 1000 }}
-                                            />
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            )}
-                            <div ref={chatEnd} />
-                        </div>
-
-                        {/* quick questions */}
-                        <div className="border-t border-border/40 px-4 py-3">
-                            <p className="text-[10px] text-muted-foreground/70 mb-2 font-medium uppercase tracking-wide">Quick Questions</p>
-                            <div className="flex gap-2 flex-wrap">
-                                {QUICK.map((q, i) => (
-                                    <motion.button
-                                        key={i}
-                                        whileHover={{ scale: 1.03 }}
-                                        whileTap={{ scale: 0.97 }}
-                                        onClick={() => sendMsg(q)}
-                                        disabled={chatLoading}
-                                        className="text-xs px-3 py-1.5 rounded-full border border-indigo-500/20 bg-indigo-500/5
-                                            hover:bg-indigo-500/15 hover:border-indigo-500/40 hover:text-indigo-400
-                                            transition-all duration-150 disabled:opacity-40"
-                                    >
-                                        {q}
-                                    </motion.button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* input */}
-                        <div className="border-t border-border/40 p-4 flex gap-3 items-end bg-muted/20">
-                            <Textarea
-                                placeholder="Ask MentorAI anything about your academics…"
-                                className="resize-none min-h-[44px] max-h-28 flex-1 text-sm bg-background/60 border-border/60 rounded-xl"
-                                value={input}
-                                onChange={e => setInput(e.target.value)}
-                                onKeyDown={e => {
-                                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); }
-                                }}
-                                rows={1}
-                            />
-                            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                                <Button
-                                    className="h-11 w-11 p-0 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 hover:opacity-90 shadow-lg"
-                                    onClick={() => sendMsg()}
-                                    disabled={!input.trim() || chatLoading}
-                                >
-                                    {chatLoading
-                                        ? <Loader2 className="h-4 w-4 animate-spin" />
-                                        : <Send className="h-4 w-4" />}
-                                </Button>
-                            </motion.div>
-                        </div>
-                    </Card>
-                </motion.div>
-
-                {/* ══════════ TREND LEGEND ════════════════════════ */}
-                <motion.div {...fade(6)}>
-                    <div className="grid grid-cols-3 gap-3">
-                        {[
-                            { icon: <TrendingUp className="h-4 w-4 text-emerald-400" />, label: "Improving", desc: "Above baseline trend", color: "emerald" },
-                            { icon: <Minus className="h-4 w-4 text-amber-400" />,       label: "Stable",    desc: "Consistent performance", color: "amber" },
-                            { icon: <TrendingDown className="h-4 w-4 text-red-400" />,  label: "Declining", desc: "Needs immediate focus", color: "red" },
-                        ].map(t => (
-                            <div key={t.label}
-                                className={`rounded-xl border border-${t.color}-500/10 bg-${t.color}-500/5 p-3.5 flex items-center gap-2.5`}>
-                                <div className={`h-8 w-8 rounded-lg bg-${t.color}-500/15 flex items-center justify-center shrink-0`}>
-                                    {t.icon}
-                                </div>
-                                <div>
-                                    <p className="text-xs font-semibold">{t.label}</p>
-                                    <p className="text-[10px] text-muted-foreground leading-tight">{t.desc}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </motion.div>
-
+                        <Card className="rounded-3xl border border-emerald-100 bg-emerald-50/60 shadow-sm">
+                            <CardContent className="p-5 flex items-start gap-3">
+                                <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5" />
+                                <p className="text-sm text-emerald-800">
+                                    The planner below now uses your current timetable plus backlog recovery hours. If you skip a session, your mentor and subject handler can be alerted and track follow-up support.
+                                </p>
+                            </CardContent>
+                        </Card>
+                    </>
+                )}
             </div>
         </DashboardLayout>
     );

@@ -1,478 +1,953 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Users, Calendar, AlertTriangle, TrendingUp, CheckCircle, Mail, MoreHorizontal, Plus, LayoutDashboard } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Clock } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+  AlertTriangle,
+  BookOpen,
+  Calendar,
+  LayoutDashboard,
+  MessageSquare,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { hasRole } from "@/lib/authSession";
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from "recharts";
-import { Alert as AlertUI, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
 
-const navItems = [
-    { label: "Overview", icon: <LayoutDashboard className="h-4 w-4" />, path: "/dashboard/mentor", isActive: true },
-    { label: "My Mentees", icon: <Users className="h-4 w-4" />, path: "/dashboard/mentor/mentees" },
-    { label: "Faculty Dashboard", icon: <Calendar className="h-4 w-4" />, path: "/dashboard/faculty" },
-    { label: "Reports", icon: <TrendingUp className="h-4 w-4" />, path: "/dashboard/mentor/reports" },
+const BASE = "http://localhost:5000";
+
+const mentorNavItems = [
+  { label: "Overview", icon: <LayoutDashboard className="h-4 w-4" />, path: "/dashboard/mentor", isActive: true },
+  { label: "Faculty Dashboard", icon: <LayoutDashboard className="h-4 w-4" />, path: "/dashboard/faculty" },
+  { label: "My Mentees", icon: <Users className="h-4 w-4" />, path: "/dashboard/mentor/mentees" },
+  { label: "Sessions", icon: <Calendar className="h-4 w-4" />, path: "/dashboard/mentor/sessions" },
+  { label: "Timetable", icon: <Calendar className="h-4 w-4" />, path: "/dashboard/faculty/timetable" },
+  { label: "Academics", icon: <BookOpen className="h-4 w-4" />, path: "/dashboard/mentor/academics" },
+  { label: "AI Reports", icon: <TrendingUp className="h-4 w-4" />, path: "/dashboard/mentor/ai-reports" },
+  { label: "Reports", icon: <TrendingUp className="h-4 w-4" />, path: "/dashboard/mentor/reports" },
 ];
 
-const menteePerformanceData = [
-    { name: "Batch A", score: 85 },
-    { name: "Batch B", score: 72 },
-    { name: "Batch C", score: 90 },
-    { name: "Batch D", score: 65 }, // Low
-];
-
-// Removed hardcoded mentees array
-
-const anim = (i: number) => ({
-    initial: { opacity: 0, y: 16 },
-    animate: { opacity: 1, y: 0 },
-    transition: { delay: i * 0.08 },
-});
-
-const MentorDashboard = () => {
-    const navigate = useNavigate();
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const [mentees, setMentees] = useState<any[]>([]);
-    const [alerts, setAlerts] = useState<any[]>([]);
-    const [loggedInterventions, setLoggedInterventions] = useState<any>({});
-    const [sessions, setSessions] = useState<any[]>([]);
-    const [sessionActionLoading, setSessionActionLoading] = useState<number | null>(null);
-
-    // Intervention Modal State
-    const [interventionModalOpen, setInterventionModalOpen] = useState(false);
-    const [selectedStudentForIntervention, setSelectedStudentForIntervention] = useState<any>(null);
-    const [interventionType, setInterventionType] = useState<string>("");
-    const [interventionNotes, setInterventionNotes] = useState<string>("");
-
-    useEffect(() => {
-        if (user.id) {
-            fetch(`http://localhost:5000/api/analytics/mentor/${user.id}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        // Sort by risk_score descending
-                        const sorted = data.data.sort((a: any, b: any) => b.risk_score - a.risk_score);
-                        setMentees(sorted);
-                    }
-                })
-                .catch(err => console.error("Failed to fetch mentees", err));
-        }
-    }, [user.id]);
-
-    useEffect(() => {
-        if (user.id) {
-            fetch(`http://localhost:5000/api/alerts/mentor/${user.id}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        setAlerts(data.data);
-                    }
-                })
-                .catch(err => console.error("Failed to fetch mentor alerts", err));
-        }
-    }, [user.id]);
-
-    const [plannerStats, setPlannerStats] = useState<any>({});
-    useEffect(() => {
-        if (user.id) {
-            fetch(`http://localhost:5000/api/planner/mentor/${user.id}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        const statsMap: any = {};
-                        data.data.forEach((s: any) => {
-                            statsMap[s.student_id] = s;
-                        });
-                        setPlannerStats(statsMap);
-                    }
-                })
-                .catch(err => console.error("Failed to fetch mentor planner stats", err));
-        }
-    }, [user.id]);
-
-    useEffect(() => {
-        if (user.id) {
-            fetch(`http://localhost:5000/api/intervention/mentor/${user.id}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        setLoggedInterventions(data.data);
-                    }
-                })
-                .catch(err => console.error("Failed to fetch logged interventions", err));
-        }
-    }, [user.id]);
-
-    useEffect(() => {
-        if (user.id) {
-            fetch(`http://localhost:5000/api/session/mentor/${user.id}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        setSessions(data.data);
-                    }
-                })
-                .catch(err => console.error("Failed to fetch mentor sessions", err));
-        }
-    }, [user.id]);
-
-    const handleSessionAction = (sessionId: number, action: string, extraData: any = {}) => {
-        setSessionActionLoading(sessionId);
-        fetch(`http://localhost:5000/api/session/${sessionId}/respond`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mentor_id: user.id, action, ...extraData })
-        })
-            .then(res => res.json())
-            .then(resData => {
-                if (resData.success) {
-                    setSessions(prev => prev.map(s => {
-                        if (s.id === sessionId) {
-                            return { 
-                                ...s, 
-                                status: action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : action === 'cancel' ? 'Cancelled' : 'Rescheduled',
-                                meeting_link: extraData.meeting_link !== undefined ? extraData.meeting_link : s.meeting_link
-                            };
-                        }
-                        return s;
-                    }));
-                } else {
-                    alert(resData.message);
-                }
-            })
-            .catch(err => console.error(err))
-            .finally(() => setSessionActionLoading(null));
-    };
-
-    const handleLogIntervention = () => {
-        if (!selectedStudentForIntervention || !interventionType) return;
-
-        fetch('http://localhost:5000/api/intervention/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                student_id: selectedStudentForIntervention.student_id,
-                mentor_id: user.id,
-                intervention_type: interventionType,
-                notes: interventionNotes
-            })
-        })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    setLoggedInterventions({ ...loggedInterventions, [selectedStudentForIntervention.student_id]: true });
-                    setInterventionModalOpen(false);
-                    setSelectedStudentForIntervention(null);
-                    setInterventionType("");
-                    setInterventionNotes("");
-                } else {
-                    alert(data.message);
-                }
-            })
-            .catch(err => console.error("Error logging intervention", err));
-    };
-
-    return (
-        <DashboardLayout role="mentor" roleLabel="Mentor Dashboard" navItems={navItems} gradientClass="gradient-mentor">
-            <div className="flex flex-col gap-6">
-
-                {/* Welcome Section */}
-                <motion.div {...anim(0)}>
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div>
-                            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.name || "Mentor"}</h1>
-                            <p className="text-muted-foreground">You have 3 upcoming sessions and 1 critical alert.</p>
-                        </div>
-                        <Button className="bg-mentor text-white hover:bg-mentor/90 gap-2">
-                            <Plus className="h-4 w-4" /> Schedule Session
-                        </Button>
-                    </div>
-                </motion.div>
-
-                {/* Critical Alerts Section */}
-                {alerts.length > 0 && (
-                    <motion.div {...anim(1)}>
-                        <h3 className="text-lg font-semibold mb-3 flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-destructive" /> Critical Alerts Tracker</h3>
-                        <div className="space-y-3 mb-6">
-                            {alerts.map((alert, idx) => (
-                                <AlertUI key={idx} variant={alert.type.includes('RISK') || alert.type.includes('LOW_') ? "destructive" : "default"} className="border-l-4">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <AlertTitle className="font-semibold">{alert.type.replace(/_/g, ' ')} - Student: {alert.student_id}</AlertTitle>
-                                    <AlertDescription>
-                                        {alert.message}
-                                        <span className="block text-xs opacity-70 mt-1">{alert.created_at}</span>
-                                    </AlertDescription>
-                                </AlertUI>
-                            ))}
-                        </div>
-                    </motion.div>
-                )}
-
-                {/* Stats */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {[
-                        { label: "Total Mentees", value: mentees.length.toString(), icon: Users, color: "text-blue-500" },
-                        { label: "At Risk", value: "3", icon: AlertTriangle, color: "text-red-500" },
-                        { label: "Avg Performance", value: "78%", icon: TrendingUp, color: "text-green-500" },
-                        { label: "Pending Reviews", value: "5", icon: CheckCircle, color: "text-orange-500" },
-                    ].map((stat, i) => {
-                        const Icon = stat.icon;
-                        return (
-                            <motion.div key={i} {...anim(i + 1)}>
-                                <Card>
-                                    <CardContent className="p-6 flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                                            <h3 className="text-2xl font-bold mt-2">{stat.value}</h3>
-                                        </div>
-                                        <div className={`h-12 w-12 rounded-full bg-secondary flex items-center justify-center ${stat.color}`}>
-                                            <Icon className="h-6 w-6" />
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </motion.div>
-                        );
-                    })}
-                </div>
-
-                {/* Main Content Grid */}
-                <div className="grid gap-6 md:grid-cols-7">
-
-                    {/* Mentees List */}
-                    <motion.div className="md:col-span-4" {...anim(5)}>
-                        <Card className="h-full">
-                            <CardHeader>
-                                <CardTitle>My Mentees</CardTitle>
-                                <CardDescription>Students assigned to your mentorship group</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {mentees.length === 0 ? (
-                                        <div className="text-center py-10 text-muted-foreground italic">No mentees assigned.</div>
-                                    ) : (
-                                        mentees.slice(0, 5).map((student) => (
-                                            <div key={student.student_id} className="flex items-center justify-between p-4 rounded-xl border border-border/50 hover:border-mentor/30 hover:bg-mentor/5 transition-all group">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="relative">
-                                                        <Avatar className="h-12 w-12 border-2 border-background shadow-sm group-hover:scale-105 transition-transform">
-                                                            <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${student.name}`} />
-                                                            <AvatarFallback>{student.name.substring(0, 2)}</AvatarFallback>
-                                                        </Avatar>
-                                                        {(student.adjusted_risk || 0) >= 70 && (
-                                                            <span className="absolute -top-1 -right-1 flex h-4 w-4 shadow-sm bg-destructive rounded-full border-2 border-background" />
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-bold text-sm tracking-tight">{student.name}</p>
-                                                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">{student.student_id}</p>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center gap-6">
-                                                    <div className="hidden sm:flex flex-col items-end">
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className={`text-xl font-black tracking-tighter ${(student.adjusted_risk || 0) >= 70 ? 'text-destructive' : (student.adjusted_risk || 0) >= 40 ? 'text-orange-500' : 'text-green-600'}`}>
-                                                                {(student.adjusted_risk || 0).toFixed(1)}%
-                                                            </span>
-                                                            <span className="text-[8px] text-muted-foreground font-bold uppercase">Risk</span>
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            <Badge variant="outline" className="text-[9px] py-0 px-1.5 h-4 bg-muted/50 border-none font-medium">
-                                                                {plannerStats[student.student_id]?.compliance || 0}% Compliance
-                                                            </Badge>
-                                                        </div>
-                                                    </div>
-
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-mentor/10 group-hover:text-mentor">
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" className="w-48">
-                                                            <DropdownMenuItem className="font-medium">View Profile</DropdownMenuItem>
-                                                            <DropdownMenuItem>Message Student</DropdownMenuItem>
-                                                            {(student.adjusted_risk || 0) >= 70 && (
-                                                                <DropdownMenuItem
-                                                                    className="text-destructive font-bold"
-                                                                    onClick={() => {
-                                                                        setSelectedStudentForIntervention(student);
-                                                                        setInterventionModalOpen(true);
-                                                                    }}
-                                                                >
-                                                                    Log Intervention
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                    {mentees.length > 5 && (
-                                        <Button
-                                            variant="ghost"
-                                            className="w-full text-xs text-muted-foreground hover:text-mentor"
-                                            onClick={() => navigate("/dashboard/mentor/mentees")}
-                                        >
-                                            View all {mentees.length} mentees
-                                        </Button>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </motion.div>
-
-                    {/* Performance Chart & Actions */}
-                    <div className="md:col-span-3 space-y-6">
-                        <motion.div {...anim(6)}>
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Group Performance</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <ResponsiveContainer width="100%" height={200}>
-                                        <BarChart data={menteePerformanceData}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                            <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                                            <YAxis hide />
-                                            <Tooltip cursor={{ fill: 'transparent' }} />
-                                            <Bar dataKey="score" radius={[4, 4, 0, 0]}>
-                                                {menteePerformanceData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.score < 70 ? '#ef4444' : '#0ea5e9'} />
-                                                ))}
-                                            </Bar>
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </CardContent>
-                            </Card>
-                        </motion.div>
-
-                        <motion.div {...anim(7)}>
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Quick Actions</CardTitle>
-                                </CardHeader>
-                                <CardContent className="grid gap-2">
-                                    <Button variant="outline" className="justify-start gap-2 h-12">
-                                        <Mail className="h-4 w-4 text-mentor" /> Send Bulk Announcement
-                                    </Button>
-                                    <Button variant="outline" className="justify-start gap-2 h-12">
-                                        <Calendar className="h-4 w-4 text-mentor" /> Reschedule All Meetings
-                                    </Button>
-                                    <Button variant="outline" className="justify-start gap-2 h-12">
-                                        <TrendingUp className="h-4 w-4 text-mentor" /> Generate Monthly Report
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                        </motion.div>
-                    </div>
-
-                    {/* Mentoring Sessions Section */}
-                    <motion.div className="md:col-span-7" {...anim(8)}>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5 text-mentor" /> Mentoring Sessions</CardTitle>
-                                <CardDescription>Manage incoming session requests and upcoming meetings</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                {sessions.length === 0 ? (
-                                    <div className="text-center py-8 text-muted-foreground">No sessions found.</div>
-                                ) : (
-                                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                        {sessions.map(session => (
-                                            <div key={session.id} className="flex flex-col justify-between p-4 rounded-xl border border-border bg-card hover:shadow-sm transition-shadow">
-                                                <div className="flex flex-col gap-2">
-                                                    <div className="flex items-start justify-between">
-                                                        <div>
-                                                            <div className="font-bold text-base">{session.student_name}</div>
-                                                            <div className="text-xs text-muted-foreground font-medium">{session.student_id}</div>
-                                                        </div>
-                                                        <Badge variant={session.status === 'Pending' ? 'secondary' : session.status === 'Approved' ? 'default' : 'destructive'} className={session.status === 'Approved' ? 'bg-green-500 hover:bg-green-600 font-bold' : 'font-bold'}>
-                                                            {session.status}
-                                                        </Badge>
-                                                    </div>
-                                                    
-                                                    <div className="flex flex-col gap-1 mt-2">
-                                                        <div className="flex items-center text-sm text-foreground/80 gap-2">
-                                                            <Calendar className="h-4 w-4 text-muted-foreground" /> {new Date(session.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-                                                        </div>
-                                                        <div className="flex items-center text-sm text-foreground/80 gap-2">
-                                                            <Clock className="h-4 w-4 text-muted-foreground" /> {session.time_slot} ({session.session_type})
-                                                        </div>
-                                                    </div>
-
-                                                    {session.notes && (
-                                                        <div className="text-xs text-muted-foreground bg-muted p-2 rounded-md mt-2 border max-h-24 overflow-y-auto">
-                                                            {session.notes.split('\n').map((line: string, i: number) => <div key={i}>{line}</div>)}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                
-                                                <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t">
-                                                    {session.status === 'Pending' && (
-                                                        <>
-                                                            <Button size="sm" className="bg-green-600 hover:bg-green-700 flex-1" onClick={() => {
-                                                                const link = session.session_type.toLowerCase() === 'online' ? prompt('Enter meeting link (optional):', session.meeting_link || '') || '' : '';
-                                                                handleSessionAction(session.id, 'approve', { meeting_link: link });
-                                                            }} disabled={sessionActionLoading === session.id}>
-                                                                Approve
-                                                            </Button>
-                                                            <Button size="sm" variant="destructive" className="flex-1" onClick={() => handleSessionAction(session.id, 'reject')} disabled={sessionActionLoading === session.id}>
-                                                                Reject
-                                                            </Button>
-                                                        </>
-                                                    )}
-                                                    {session.status === 'Approved' && (
-                                                        <>
-                                                            {session.meeting_link && session.session_type.toLowerCase() === 'online' && (
-                                                                <Button size="sm" className="bg-mentor text-white hover:bg-mentor/90 flex-1" onClick={() => window.open(session.meeting_link.startsWith('http') ? session.meeting_link : `https://${session.meeting_link}`, '_blank')}>Join</Button>
-                                                            )}
-                                                            {!session.meeting_link && session.session_type.toLowerCase() === 'online' && (
-                                                                <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => {
-                                                                    const link = prompt('Enter meeting link:');
-                                                                    if (link) handleSessionAction(session.id, 'approve', { meeting_link: link });
-                                                                }} disabled={sessionActionLoading === session.id}>Add Link</Button>
-                                                            )}
-                                                            <Button size="sm" variant="outline" className="flex-1" onClick={() => handleSessionAction(session.id, 'cancel')} disabled={sessionActionLoading === session.id}>Cancel</Button>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </motion.div>
-                </div>
-            </div>
-        </DashboardLayout>
-    );
+type StudentRow = {
+  student_id: string;
+  student_name: string;
+  department: string;
+  batch: string;
+  attendance_percent: number;
+  risk_score: number;
+  risk_level: "High" | "Medium" | "Low";
+  pending_interventions: number;
 };
 
-export default MentorDashboard;
+type AlertRow = {
+  id: number;
+  student_id: string;
+  type: string;
+  message: string;
+  created_at: string;
+  is_read: boolean;
+};
+
+type RiskResponse = {
+  student_id: string;
+  overall_risk_score: number;
+  overall_risk_level: "High" | "Medium" | "Low";
+  ai_explanation: string;
+  subject_risks: Array<{
+    subject_code: string;
+    risk_score: number;
+    risk_level: "High" | "Medium" | "Low";
+    attendance_percent: number;
+    avg_marks: number;
+    explanation: string;
+  }>;
+};
+
+type SessionRow = {
+  id: number;
+  date: string;
+  time_slot: string;
+  duration: number;
+  mode: string;
+  topic: string;
+  status: string;
+  student_id: string;
+  student_name: string;
+  notes: string;
+  meeting_link?: string;
+};
+
+type InterventionRow = {
+  id: number;
+  student_id: string;
+  mentor_id: number;
+  intervention_type: string;
+  notes: string;
+  date: string;
+  risk_snapshot: number;
+  created_at: string;
+};
+
+type MarkRow = {
+  subject_code: string;
+  internal1: number | null;
+  internal2: number | null;
+  internal3: number | null;
+};
+
+type AttendanceRow = {
+  subject_code?: string;
+  subject_name?: string;
+  percentage?: number;
+};
+
+type ChatRow = {
+  id: number;
+  student_id: string;
+  mentor_id: number;
+  message: string;
+  sender_role: "mentor" | "student";
+  sent_at: string;
+  is_read: boolean;
+};
+
+type ImpactResponse = {
+  intervention_id: number;
+  student_id: string;
+  before: {
+    marks_avg: number;
+    attendance_percent: number;
+    risk_score: number;
+  };
+  after: {
+    marks_avg: number;
+    attendance_percent: number;
+    risk_score: number;
+  };
+  risk_delta: number;
+};
+
+type CertificateRow = {
+  id: number;
+  activity_name: string;
+  category: string;
+  date_of_event: string | null;
+  file_path: string | null;
+  download_url: string | null;
+  share_with_mentor: boolean;
+  uploaded_at: string | null;
+};
+
+type ReportResponse = {
+  summary: {
+    total_students_assigned: number;
+    high_risk_students: number;
+    sessions_held_this_month: number;
+    intervention_success_rate: number;
+  };
+  students_progress: Array<{
+    student_id: string;
+    student_name: string;
+    initial_risk: number;
+    current_risk: number;
+    attendance_change: number;
+    marks_change: number;
+    last_intervention_date: string | null;
+    improvement_score: number;
+  }>;
+};
+
+const riskBadgeClass = (level: string) => {
+  if (level === "High") return "bg-red-100 text-red-700 border-red-200";
+  if (level === "Medium") return "bg-amber-100 text-amber-700 border-amber-200";
+  return "bg-emerald-100 text-emerald-700 border-emerald-200";
+};
+
+const statusBadgeClass = (status: string) => {
+  const s = String(status || "").toLowerCase();
+  if (s === "approved") return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  if (s === "completed") return "bg-emerald-600 text-white border-emerald-700";
+  if (s === "pending") return "bg-amber-100 text-amber-700 border-amber-200";
+  if (s === "rejected") return "bg-red-100 text-red-700 border-red-200";
+  if (s === "cancelled" || s === "canceled") return "bg-slate-100 text-slate-600 border-slate-200";
+  return "bg-slate-100 text-slate-600 border-slate-200";
+};
+
+const sessionStartTs = (dateStr: string, timeSlot: string) => {
+  const t = String(timeSlot || "00:00").split("-")[0].trim(); // supports "10:00" or "10:00-10:30"
+  const [hhRaw, mmRaw] = t.split(":");
+  const hh = Number(hhRaw || 0);
+  const mm = Number(mmRaw || 0);
+  return new Date(`${dateStr}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00`).getTime();
+};
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error && typeof error === "object" && "message" in error && typeof (error as { message?: unknown }).message === "string") {
+    return (error as { message: string }).message;
+  }
+  return fallback;
+};
+
+export default function MentorDashboard() {
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const mentorId = Number(user?.id || 0);
+  const isSubjectHandler = hasRole(user, "subject-handler");
+  const navItems = [
+    ...mentorNavItems,
+    ...(isSubjectHandler ? [{ label: "Subject Handler", icon: <BookOpen className="h-4 w-4" />, path: "/dashboard/subject-handler/manage" }] : []),
+  ];
+
+  const [tab, setTab] = useState<"monitoring" | "sessions" | "interventions" | "communication" | "reports">("monitoring");
+  const [students, setStudents] = useState<StudentRow[]>([]);
+  const [alerts, setAlerts] = useState<AlertRow[]>([]);
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [report, setReport] = useState<ReportResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const [selectedStudent, setSelectedStudent] = useState<StudentRow | null>(null);
+  const [selectedRisk, setSelectedRisk] = useState<RiskResponse | null>(null);
+  const [selectedMarks, setSelectedMarks] = useState<MarkRow[]>([]);
+  const [selectedAttendance, setSelectedAttendance] = useState<AttendanceRow[]>([]);
+  const [selectedInterventions, setSelectedInterventions] = useState<InterventionRow[]>([]);
+  const [impact, setImpact] = useState<ImpactResponse | null>(null);
+  const [studentDialogOpen, setStudentDialogOpen] = useState(false);
+
+  const [sessionForm, setSessionForm] = useState({
+    student_id: "",
+    date: new Date().toISOString().split("T")[0],
+    time_slot: "10:00",
+    duration: 30,
+    mode: "Offline",
+    topic: "",
+    notes: "",
+  });
+
+  const [interventionForm, setInterventionForm] = useState({
+    student_id: "",
+    intervention_type: "Academic",
+    date: new Date().toISOString().split("T")[0],
+    notes: "",
+  });
+
+  const [chatStudentId, setChatStudentId] = useState("");
+  const [chatRows, setChatRows] = useState<ChatRow[]>([]);
+  const [chatMessage, setChatMessage] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [search, setSearch] = useState("");
+
+  const filteredStudents = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return students;
+    return students.filter((s) => s.student_name.toLowerCase().includes(term) || s.student_id.toLowerCase().includes(term));
+  }, [students, search]);
+
+  const fetchStudents = async () => {
+    const res = await fetch(`${BASE}/api/mentor/students?mentor_id=${mentorId}`);
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "Failed to load mentor students");
+    setStudents(data.data || []);
+  };
+
+  const fetchAlerts = async () => {
+    const res = await fetch(`${BASE}/api/alerts/mentor/${mentorId}?unread=true`);
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "Failed to load alerts");
+    setAlerts(data.data || []);
+  };
+
+  const fetchSessions = async () => {
+    const res = await fetch(`${BASE}/api/sessions/mentor/${mentorId}`);
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "Failed to load sessions");
+    setSessions(data.data || []);
+  };
+
+  const fetchReport = async () => {
+    const res = await fetch(`${BASE}/api/reports/mentor/${mentorId}?period=month`);
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "Failed to load report");
+    setReport(data.data || null);
+  };
+
+  const fetchUnread = async () => {
+    const res = await fetch(`${BASE}/api/chat/unread-count?mentor_id=${mentorId}`);
+    const data = await res.json();
+    if (res.ok && data.success) {
+      setUnreadCount(data.data?.unread_count || 0);
+    }
+  };
+
+  const refreshAll = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([fetchStudents(), fetchAlerts(), fetchSessions(), fetchReport(), fetchUnread()]);
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, "Failed to refresh mentor dashboard"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!mentorId) return;
+    refreshAll();
+    const timer = setInterval(() => {
+      fetchAlerts().catch(() => undefined);
+      fetchUnread().catch(() => undefined);
+    }, 25000);
+    return () => clearInterval(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mentorId]);
+
+  const openStudentProfile = async (student: StudentRow) => {
+    try {
+      setSelectedStudent(student);
+      const [riskRes, marksRes, attendanceRes, interventionsRes] = await Promise.all([
+        fetch(`${BASE}/api/risk/student/${student.student_id}`),
+        fetch(`${BASE}/mentor/mentees/${student.student_id}/marks`),
+        fetch(`${BASE}/mentor/mentees/${student.student_id}/attendance`),
+        fetch(`${BASE}/api/interventions/student/${student.student_id}`),
+      ]);
+      const riskData = await riskRes.json();
+      const marksData = await marksRes.json();
+      const attendanceData = await attendanceRes.json();
+      const interventionsData = await interventionsRes.json();
+      if (riskRes.ok && riskData.success) setSelectedRisk(riskData.data);
+      else setSelectedRisk(null);
+
+      setSelectedMarks(marksData.data || []);
+      setSelectedAttendance(attendanceData.data || []);
+      setSelectedInterventions(interventionsData.data || []);
+      setInterventionForm((prev) => ({ ...prev, student_id: student.student_id }));
+      setChatStudentId(student.student_id);
+      setImpact(null);
+      setStudentDialogOpen(true);
+    } catch {
+      toast.error("Failed to open student profile");
+    }
+  };
+
+  const markAlertRead = async (id: number) => {
+    const res = await fetch(`${BASE}/api/alerts/mark-read`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alert_id: id }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "Failed to mark alert read");
+    setAlerts((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const createSession = async () => {
+    if (!sessionForm.student_id || !sessionForm.topic.trim()) {
+      toast.error("Student and topic are required");
+      return;
+    }
+    const res = await fetch(`${BASE}/api/sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mentor_id: mentorId,
+        ...sessionForm,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "Failed to schedule session");
+    toast.success("Session scheduled");
+    await fetchSessions();
+  };
+
+  const updateSessionStatus = async (sessionId: number, action: "approve" | "reject" | "cancel" | "complete") => {
+    const res = await fetch(`${BASE}/api/sessions/${sessionId}/approve`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "Failed to update session");
+    await fetchSessions();
+  };
+
+  const createIntervention = async () => {
+    if (!interventionForm.student_id || !interventionForm.notes.trim()) {
+      toast.error("Student and notes are required");
+      return;
+    }
+    const res = await fetch(`${BASE}/api/interventions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mentor_id: mentorId,
+        ...interventionForm,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "Failed to create intervention");
+    toast.success("Intervention recorded");
+    const iv = await fetch(`${BASE}/api/interventions/student/${interventionForm.student_id}`);
+    const ivData = await iv.json();
+    if (iv.ok && ivData.success) setSelectedInterventions(ivData.data || []);
+  };
+
+  const viewImpact = async (interventionId: number) => {
+    const res = await fetch(`${BASE}/api/interventions/impact/${interventionId}`);
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "Failed to load intervention impact");
+    setImpact(data.data);
+  };
+
+  const loadChat = async () => {
+    if (!chatStudentId.trim()) return;
+    const res = await fetch(`${BASE}/api/chat/${chatStudentId.trim().toUpperCase()}?mentor_id=${mentorId}`);
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "Failed to load chat");
+    setChatRows(data.data || []);
+  };
+
+  const sendChat = async () => {
+    if (!chatStudentId.trim() || !chatMessage.trim()) {
+      toast.error("Student and message are required");
+      return;
+    }
+    const res = await fetch(`${BASE}/api/chat/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        student_id: chatStudentId.trim().toUpperCase(),
+        mentor_id: mentorId,
+        message: chatMessage,
+        sender_role: "mentor",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "Failed to send message");
+    setChatMessage("");
+    await loadChat();
+  };
+
+  const marksTrendData = useMemo(() => {
+    const map: Record<string, { subject: string; internal1: number | null; internal2: number | null; internal3: number | null }> = {};
+    (selectedMarks || []).forEach((m) => {
+      const code = m.subject_code || "NA";
+      if (!map[code]) map[code] = { subject: code, internal1: null, internal2: null, internal3: null };
+      map[code].internal1 = m.internal1;
+      map[code].internal2 = m.internal2;
+      map[code].internal3 = m.internal3;
+    });
+    return Object.values(map);
+  }, [selectedMarks]);
+
+  const attendanceTrendData = useMemo(() => {
+    return (selectedAttendance || []).map((a) => ({
+      subject: a.subject_code || a.subject_name || "NA",
+      attendance: Number(a.percentage || 0),
+    }));
+  }, [selectedAttendance]);
+
+  const upcomingSessions = useMemo(() => {
+    const now = Date.now();
+    const rows = (sessions || []).filter((s) => {
+      const st = String(s.status || "").toLowerCase();
+      if (st !== "pending" && st !== "approved") return false;
+      return sessionStartTs(s.date, s.time_slot) >= now;
+    });
+    rows.sort((a, b) => sessionStartTs(a.date, a.time_slot) - sessionStartTs(b.date, b.time_slot));
+    return rows;
+  }, [sessions]);
+
+  const historySessions = useMemo(() => {
+    const now = Date.now();
+    const rows = (sessions || []).filter((s) => {
+      const st = String(s.status || "").toLowerCase();
+      if (["completed", "rejected", "cancelled", "canceled"].includes(st)) return true;
+      if ((st === "approved" || st === "pending") && sessionStartTs(s.date, s.time_slot) < now) return true;
+      return false;
+    });
+    rows.sort((a, b) => sessionStartTs(b.date, b.time_slot) - sessionStartTs(a.date, a.time_slot));
+    return rows;
+  }, [sessions]);
+
+  return (
+    <DashboardLayout role="mentor" roleLabel="Mentor Dashboard" navItems={navItems} gradientClass="gradient-mentor">
+      <div className="space-y-6">
+        <Card className="border border-slate-200">
+          <CardHeader>
+            <CardTitle>Mentor Dashboard Module</CardTitle>
+            <CardDescription>Monitoring, AI risk, sessions, interventions, communication, and reports.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="rounded-md border p-3"><div className="text-xs text-muted-foreground">Total Students</div><div className="text-xl font-bold">{report?.summary.total_students_assigned ?? students.length}</div></div>
+              <div className="rounded-md border p-3"><div className="text-xs text-muted-foreground">High Risk</div><div className="text-xl font-bold text-red-600">{report?.summary.high_risk_students ?? students.filter(s => s.risk_level === "High").length}</div></div>
+              <div className="rounded-md border p-3"><div className="text-xs text-muted-foreground">Sessions This Month</div><div className="text-xl font-bold">{report?.summary.sessions_held_this_month ?? 0}</div></div>
+              <div className="rounded-md border p-3"><div className="text-xs text-muted-foreground">Intervention Success</div><div className="text-xl font-bold">{report?.summary.intervention_success_rate ?? 0}%</div></div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant={tab === "monitoring" ? "default" : "outline"} onClick={() => setTab("monitoring")}>Student Monitoring</Button>
+              <Button variant={tab === "sessions" ? "default" : "outline"} onClick={() => setTab("sessions")}>Sessions</Button>
+              <Button variant={tab === "interventions" ? "default" : "outline"} onClick={() => setTab("interventions")}>Interventions</Button>
+              <Button variant={tab === "communication" ? "default" : "outline"} onClick={() => setTab("communication")}>Communication {unreadCount > 0 ? `(${unreadCount})` : ""}</Button>
+              <Button variant={tab === "reports" ? "default" : "outline"} onClick={() => setTab("reports")}>Reports</Button>
+              <Button variant="outline" onClick={() => window.location.href = "/dashboard/mentor/ai-reports"}>🤖 AI Reports</Button>
+              <Button variant="outline" onClick={refreshAll} disabled={loading}>Refresh</Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {tab === "monitoring" && (
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card className="lg:col-span-2 border border-slate-200">
+              <CardHeader>
+                <CardTitle>Assigned Students</CardTitle>
+                <CardDescription>Name, ID, risk, attendance, and pending interventions.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Input placeholder="Search student name or ID..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                <div className="max-h-[450px] overflow-auto rounded-md border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-100">
+                      <tr>
+                        <th className="p-2 text-left">Student</th>
+                        <th className="p-2 text-left">Risk</th>
+                        <th className="p-2 text-left">Attendance</th>
+                        <th className="p-2 text-left">Pending</th>
+                        <th className="p-2 text-left">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredStudents.map((s) => (
+                        <tr key={s.student_id} className="border-t">
+                          <td className="p-2">{s.student_name}<div className="text-xs text-muted-foreground">{s.student_id}</div></td>
+                          <td className="p-2"><Badge className={riskBadgeClass(s.risk_level)}>{s.risk_level} ({s.risk_score})</Badge></td>
+                          <td className="p-2">{s.attendance_percent}%</td>
+                          <td className="p-2">{s.pending_interventions}</td>
+                          <td className="p-2"><Button size="sm" variant="outline" onClick={() => openStudentProfile(s)}>View Profile</Button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-slate-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> At-Risk Alerts</CardTitle>
+                <CardDescription>Unread mentor alerts and quick acknowledge.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 max-h-[500px] overflow-auto">
+                {alerts.length === 0 && <div className="text-sm text-muted-foreground">No unread alerts.</div>}
+                {alerts.map((a) => (
+                  <div key={a.id} className="rounded-md border p-3">
+                    <div className="text-xs font-semibold text-slate-600">{a.type}</div>
+                    <div className="text-sm font-medium">{a.student_id}</div>
+                    <div className="text-sm">{a.message}</div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</span>
+                      <Button size="sm" variant="ghost" onClick={() => markAlertRead(a.id).catch((e) => toast.error(e.message || "Failed"))}>Mark Read</Button>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {tab === "sessions" && (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="border border-slate-200">
+              <CardHeader><CardTitle>Schedule Session</CardTitle><CardDescription>Prevents mentor/student double booking.</CardDescription></CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-1">
+                  <div className="text-xs font-medium text-muted-foreground">Student</div>
+                  <select
+                    className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                    value={sessionForm.student_id}
+                    onChange={(e) => setSessionForm((p) => ({ ...p, student_id: e.target.value }))}
+                  >
+                    <option value="">Select mentee...</option>
+                    {students.map((s) => (
+                      <option key={s.student_id} value={s.student_id}>
+                        {s.student_name} ({s.student_id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input type="date" value={sessionForm.date} onChange={(e) => setSessionForm((p) => ({ ...p, date: e.target.value }))} />
+                  <Input type="time" value={sessionForm.time_slot} onChange={(e) => setSessionForm((p) => ({ ...p, time_slot: e.target.value }))} />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <select className="rounded-md border px-3 py-2 text-sm" value={sessionForm.duration} onChange={(e) => setSessionForm((p) => ({ ...p, duration: Number(e.target.value) }))}>
+                    <option value={30}>30 min</option>
+                    <option value={60}>60 min</option>
+                  </select>
+                  <select className="rounded-md border px-3 py-2 text-sm" value={sessionForm.mode} onChange={(e) => setSessionForm((p) => ({ ...p, mode: e.target.value }))}>
+                    <option>Online</option>
+                    <option>Offline</option>
+                  </select>
+                </div>
+                {String(sessionForm.mode || "").toLowerCase() === "online" && (
+                  <div className="text-xs text-muted-foreground">
+                    Online sessions auto-create a Google Meet link and notify the student with an easy join link.
+                  </div>
+                )}
+                <Input placeholder="Topic" value={sessionForm.topic} onChange={(e) => setSessionForm((p) => ({ ...p, topic: e.target.value }))} />
+                <Textarea placeholder="Notes" value={sessionForm.notes} onChange={(e) => setSessionForm((p) => ({ ...p, notes: e.target.value }))} />
+                <Button onClick={() => createSession().catch((e) => toast.error(e.message || "Failed to schedule"))}>Create Session</Button>
+              </CardContent>
+            </Card>
+
+              <div className="space-y-4">
+                <Card className="border border-slate-200">
+                  <CardHeader>
+                    <CardTitle>Upcoming Sessions</CardTitle>
+                    <CardDescription>Pending and approved sessions that are coming up soon.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 max-h-[240px] overflow-auto">
+                    {upcomingSessions.length === 0 && <div className="text-sm text-muted-foreground">No upcoming sessions.</div>}
+                    {upcomingSessions.map((s) => (
+                      <div key={s.id} className="rounded-md border p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-semibold truncate">{s.student_name} ({s.student_id})</div>
+                            <div className="text-sm text-muted-foreground">{s.date} {s.time_slot} • {s.mode} • {s.topic}</div>
+                          </div>
+                          <Badge className={statusBadgeClass(s.status)}>{s.status}</Badge>
+                        </div>
+                        {String(s.mode || "").toLowerCase() === "online" && s.meeting_link && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => window.open(s.meeting_link as string, "_blank", "noopener,noreferrer")}
+                            >
+                              Join Google Meet
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(String(s.meeting_link));
+                                  toast.success("Meet link copied");
+                                } catch {
+                                  toast.error("Failed to copy link");
+                                }
+                              }}
+                            >
+                            Copy Link
+                          </Button>
+                        </div>
+                        )}
+                        {String(s.status || "").toLowerCase() === "pending" && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => updateSessionStatus(s.id, "approve").catch((e) => toast.error(e.message || "Failed"))}>
+                              Approve
+                            </Button>
+                            <Button size="sm" variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" onClick={() => updateSessionStatus(s.id, "reject").catch((e) => toast.error(e.message || "Failed"))}>
+                              Reject
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-slate-200">
+                  <CardHeader>
+                    <CardTitle>Session History</CardTitle>
+                    <CardDescription>Completed sessions show in green. Rejected sessions show in red with no extra buttons.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 max-h-[240px] overflow-auto">
+                    {historySessions.length === 0 && <div className="text-sm text-muted-foreground">No session history yet.</div>}
+                    {historySessions.map((s) => {
+                      const st = String(s.status || "").toLowerCase();
+                      const hasPassed = sessionStartTs(s.date, s.time_slot) < Date.now();
+                      const showComplete = st === "approved" && hasPassed;
+                      const showApproveReject = st === "pending";
+                      return (
+                        <div key={s.id} className="rounded-md border p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-semibold truncate">{s.student_name} ({s.student_id})</div>
+                              <div className="text-sm text-muted-foreground">{s.date} {s.time_slot} • {s.mode} • {s.topic}</div>
+                            </div>
+                            <Badge className={statusBadgeClass(s.status)}>{s.status}</Badge>
+                          </div>
+                          {String(s.mode || "").toLowerCase() === "online" && s.meeting_link && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open(s.meeting_link as string, "_blank", "noopener,noreferrer")}
+                              >
+                                Join Google Meet
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={async () => {
+                                  try {
+                                    await navigator.clipboard.writeText(String(s.meeting_link));
+                                    toast.success("Meet link copied");
+                                  } catch {
+                                    toast.error("Failed to copy link");
+                                  }
+                                }}
+                              >
+                                Copy Link
+                              </Button>
+                            </div>
+                          )}
+                          {showApproveReject && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => updateSessionStatus(s.id, "approve").catch((e) => toast.error(e.message || "Failed"))}>
+                                Approve
+                              </Button>
+                              <Button size="sm" variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" onClick={() => updateSessionStatus(s.id, "reject").catch((e) => toast.error(e.message || "Failed"))}>
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                          {showComplete && (
+                            <div className="mt-2">
+                              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => updateSessionStatus(s.id, "complete").catch((e) => toast.error(e.message || "Failed"))}>
+                                Complete
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              </div>
+          </div>
+        )}
+
+        {tab === "interventions" && (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="border border-slate-200">
+              <CardHeader><CardTitle>Record Intervention</CardTitle><CardDescription>Academic, Counseling, Remedial, Parent meeting.</CardDescription></CardHeader>
+              <CardContent className="space-y-3">
+                <select
+                  className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                  value={interventionForm.student_id}
+                  onChange={(e) => setInterventionForm((p) => ({ ...p, student_id: e.target.value }))}
+                >
+                  <option value="">Select mentee...</option>
+                  {students.map((s) => (
+                    <option key={s.student_id} value={s.student_id}>
+                      {s.student_name} ({s.student_id})
+                    </option>
+                  ))}
+                </select>
+                <select className="rounded-md border px-3 py-2 text-sm" value={interventionForm.intervention_type} onChange={(e) => setInterventionForm((p) => ({ ...p, intervention_type: e.target.value }))}>
+                  <option>Academic</option>
+                  <option>Counseling</option>
+                  <option>Remedial</option>
+                  <option>Parent meeting</option>
+                </select>
+                <Input type="date" value={interventionForm.date} onChange={(e) => setInterventionForm((p) => ({ ...p, date: e.target.value }))} />
+                <Textarea placeholder="Notes & recommendations" value={interventionForm.notes} onChange={(e) => setInterventionForm((p) => ({ ...p, notes: e.target.value }))} />
+                <Button onClick={() => createIntervention().catch((e) => toast.error(e.message || "Failed"))}>Save Intervention</Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-slate-200">
+              <CardHeader><CardTitle>Intervention Tracking</CardTitle><CardDescription>Check pre/post impact and risk change.</CardDescription></CardHeader>
+              <CardContent className="space-y-3 max-h-[500px] overflow-auto">
+                {selectedInterventions.length === 0 && <div className="text-sm text-muted-foreground">Open a student profile or add by student ID.</div>}
+                {selectedInterventions.map((iv) => (
+                  <div key={iv.id} className="rounded-md border p-3">
+                    <div className="font-semibold">{iv.student_id} • {iv.intervention_type}</div>
+                    <div className="text-sm text-muted-foreground">{iv.date}</div>
+                    <div className="text-sm mt-1">{iv.notes}</div>
+                    <Button className="mt-2" size="sm" variant="outline" onClick={() => viewImpact(iv.id).catch((e) => toast.error(e.message || "Failed to load impact"))}>View Impact</Button>
+                  </div>
+                ))}
+                {impact && (
+                  <div className="rounded-md border bg-slate-50 p-3 text-sm">
+                    <div className="font-semibold">Before vs After</div>
+                    <div>Marks: {impact.before.marks_avg} → {impact.after.marks_avg}</div>
+                    <div>Attendance: {impact.before.attendance_percent}% → {impact.after.attendance_percent}%</div>
+                    <div>Risk: {impact.before.risk_score} → {impact.after.risk_score} ({impact.risk_delta})</div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {tab === "communication" && (
+          <Card className="border border-slate-200">
+            <CardHeader><CardTitle className="flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Chat / Guidance Messages</CardTitle><CardDescription>Student-wise mentoring chat and quick guidance messages.</CardDescription></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex gap-2">
+                <select
+                  className="flex-1 rounded-md border px-3 py-2 text-sm bg-background"
+                  value={chatStudentId}
+                  onChange={(e) => setChatStudentId(e.target.value)}
+                >
+                  <option value="">Select mentee...</option>
+                  {students.map((s) => (
+                    <option key={s.student_id} value={s.student_id}>
+                      {s.student_name} ({s.student_id})
+                    </option>
+                  ))}
+                </select>
+                <Button variant="outline" onClick={() => loadChat().catch((e) => toast.error(e.message || "Failed"))}>Load Chat</Button>
+              </div>
+              <div className="max-h-[300px] overflow-auto rounded-md border p-2 space-y-2">
+                {chatRows.map((m) => (
+                  <div key={m.id} className={`rounded-md p-2 text-sm ${m.sender_role === "mentor" ? "bg-cyan-50" : "bg-slate-100"}`}>
+                    <div className="text-xs text-muted-foreground">{m.sender_role} • {new Date(m.sent_at).toLocaleString()}</div>
+                    <div>{m.message}</div>
+                  </div>
+                ))}
+              </div>
+              <Textarea placeholder="Type guidance message..." value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} />
+              <div className="flex gap-2">
+                <Button onClick={() => sendChat().catch((e) => toast.error(e.message || "Failed"))}>Send</Button>
+                <Button variant="outline" onClick={() => setChatMessage("Reminder: Assignment due Friday")}>Template: Assignment Reminder</Button>
+                <Button variant="outline" onClick={() => setChatMessage("Workshop on study skills this week.")}>Template: Study Workshop</Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {tab === "reports" && (
+          <Card className="border border-slate-200">
+            <CardHeader><CardTitle>Mentoring Reports</CardTitle><CardDescription>Risk movement, marks change, and intervention progress.</CardDescription></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="h-72 rounded-md border p-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={report?.students_progress || []}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="student_id" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="initial_risk" fill="#f59e0b" name="Initial Risk" />
+                      <Bar dataKey="current_risk" fill="#06b6d4" name="Current Risk" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="h-72 rounded-md border p-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={report?.students_progress || []}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="student_id" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="marks_change" stroke="#16a34a" name="Marks Change" />
+                      <Line type="monotone" dataKey="improvement_score" stroke="#7c3aed" name="Improvement Score" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="max-h-[340px] overflow-auto rounded-md border">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-100">
+                    <tr>
+                      <th className="p-2 text-left">Student</th>
+                      <th className="p-2 text-left">Initial → Current Risk</th>
+                      <th className="p-2 text-left">Marks Change</th>
+                      <th className="p-2 text-left">Last Intervention</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(report?.students_progress || []).map((r) => (
+                      <tr key={r.student_id} className="border-t">
+                        <td className="p-2">{r.student_name} ({r.student_id})</td>
+                        <td className="p-2">{r.initial_risk} → {r.current_risk}</td>
+                        <td className="p-2">{r.marks_change}</td>
+                        <td className="p-2">{r.last_intervention_date ? new Date(r.last_intervention_date).toLocaleDateString() : "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <Dialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>{selectedStudent?.student_name} ({selectedStudent?.student_id})</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader><CardTitle>AI Risk View</CardTitle><CardDescription>{selectedRisk?.ai_explanation || "No AI explanation available"}</CardDescription></CardHeader>
+              <CardContent className="space-y-2 max-h-[300px] overflow-auto">
+                <div className="text-sm"><span className="font-semibold">Overall:</span> {selectedRisk?.overall_risk_level} ({selectedRisk?.overall_risk_score})</div>
+                {(selectedRisk?.subject_risks || []).map((s) => (
+                  <div key={s.subject_code} className="rounded-md border p-2">
+                    <div className="font-semibold">{s.subject_code}</div>
+                    <div className="text-xs">{s.risk_level} ({s.risk_score}) • Attendance {s.attendance_percent}% • Avg {s.avg_marks}</div>
+                    <div className="text-xs text-muted-foreground">{s.explanation}</div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>Attendance Trend (Subject-wise)</CardTitle></CardHeader>
+              <CardContent className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={attendanceTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="subject" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="attendance" fill="#0ea5e9" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-2">
+              <CardHeader><CardTitle>Marks Trend (Last Internals)</CardTitle></CardHeader>
+              <CardContent className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={marksTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="subject" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="internal1" stroke="#0284c7" />
+                    <Line type="monotone" dataKey="internal2" stroke="#0ea5e9" />
+                    <Line type="monotone" dataKey="internal3" stroke="#22c55e" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+          </div>
+        </DialogContent>
+      </Dialog>
+    </DashboardLayout>
+  );
+}

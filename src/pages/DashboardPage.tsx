@@ -5,37 +5,44 @@ import MentorDashboard from "@/components/dashboards/MentorDashboard";
 import AdminDashboard from "@/components/dashboards/AdminDashboard";
 import FacultyDashboard from "@/components/dashboards/FacultyDashboard";
 import { NotebookLoader } from "@/components/ui/NotebookLoader";
+import { getAllowedRoles, hasRole, normalizeRole } from "@/lib/authSession";
 
 const RoleBasedDashboard = ({ role }: { role: string }) => {
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
   const [hasMentees, setHasMentees] = useState<boolean | null>(null);
+  const allowedRoles = getAllowedRoles(user);
 
   useEffect(() => {
-    // If the user is a mentor, check if they are allocated any mentees.
-    // If they have mentees, they get the full Mentor+Faculty Dashboard.
-    // If they don't, they only get the Faculty Timetable dashboard.
-    // For HODs and Subject Handlers, they always just get the Faculty Dashboard.
-    if (role === 'mentor' && user.id) {
+    const isFacultyType = (r: string) => ["faculty", "mentor", "hod", "subject-handler"].includes(r);
+
+    if (role === "faculty") {
+      setHasMentees(false);
+      return;
+    }
+
+    if (role === "mentor" && (allowedRoles.includes("mentor") || user.id)) {
       fetch(`http://localhost:5000/api/analytics/mentor/${user.id}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.data && data.data.length > 0) {
-            setHasMentees(true);
+        .then((res) => res.json())
+        .then((data) => {
+          const menteeCount = Array.isArray(data?.data) ? data.data.length : 0;
+          if (data.success && menteeCount > 0) {
+            localStorage.setItem("is_allocated_mentor", "true");
           } else {
-            setHasMentees(false);
+            localStorage.setItem("is_allocated_mentor", "false");
           }
+
+          setHasMentees(true);
         })
         .catch((err) => {
           console.error("Failed to fetch mentees for dashboard routing:", err);
-          setHasMentees(false);
+          setHasMentees(true);
         });
     } else {
-      // Not a mentor, so clearly doesn't have mentees in this context
       setHasMentees(false);
     }
-  }, [role, user.id]);
+  }, [allowedRoles, role, user.id]);
 
-  if (role === 'mentor' && hasMentees === null) {
+  if (role === "mentor" && hasMentees === null) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <NotebookLoader size="lg" className="text-mentor" />
@@ -43,20 +50,44 @@ const RoleBasedDashboard = ({ role }: { role: string }) => {
     );
   }
 
-  // If they have mentees (allocated mentors), show the combined Mentor Dashboard
-  if (hasMentees) {
+  if (role === "mentor" && hasMentees) {
     return <MentorDashboard />;
   }
 
-  // For unallocated mentors, hods, subject-handlers, show the Faculty Dashboard
   return <FacultyDashboard />;
 };
 
 const DashboardPage = () => {
   const { role } = useParams<{ role: string }>();
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   // Normalize role to lowercase and trim spaces for consistency
   const normalizedRole = role?.toLowerCase().trim();
+  const storedRole = normalizeRole(user?.role);
+  const allowedRoles = getAllowedRoles(user);
+
+  if (!user || !Object.keys(user).length) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (storedRole === "student" && !user.admission_number) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const isFacultyType = (r: string) => ["faculty", "mentor", "hod", "subject-handler"].includes(r);
+  const canAccessRole = (targetRole: string) => {
+    if (targetRole === "faculty") return isFacultyType(storedRole) || allowedRoles.length > 0;
+    return hasRole(user, targetRole);
+  };
+
+  if (normalizedRole && storedRole && normalizedRole !== storedRole) {
+    if (storedRole === "student") {
+      return <Navigate to={user.profile_completed ? "/dashboard/student" : "/complete-profile"} replace />;
+    }
+    if (!canAccessRole(normalizedRole)) {
+      return <Navigate to={`/dashboard/${storedRole}`} replace />;
+    }
+  }
 
   switch (normalizedRole) {
     case "student":
@@ -64,11 +95,13 @@ const DashboardPage = () => {
     case "admin":
       return <AdminDashboard />;
     case "faculty":
-      return <FacultyDashboard />;
+      return <RoleBasedDashboard role="faculty" />;
     case "mentor":
+      return canAccessRole("mentor") ? <RoleBasedDashboard role="mentor" /> : <Navigate to="/dashboard/faculty" replace />;
     case "hod":
+      return canAccessRole("hod") ? <RoleBasedDashboard role="hod" /> : <Navigate to="/dashboard/faculty" replace />;
     case "subject-handler":
-      return <RoleBasedDashboard role={normalizedRole} />;
+      return canAccessRole("subject-handler") ? <RoleBasedDashboard role="subject-handler" /> : <Navigate to="/dashboard/faculty" replace />;
     default:
       // Redirect to home or show 404 if role is invalid
       return <Navigate to="/" replace />;

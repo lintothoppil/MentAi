@@ -9,6 +9,7 @@ import { ArrowLeft, GraduationCap, Users, BookOpen, Building2, Shield, Eye, EyeO
 import { cn } from "@/lib/utils";
 import { NotebookLoader } from "@/components/ui/NotebookLoader";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { clearStoredSession, normalizeRole, persistUserSession } from "@/lib/authSession";
 
 type RoleType = "student" | "mentor" | "subject-handler" | "hod" | "admin";
 
@@ -109,18 +110,21 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Store user data
-        localStorage.setItem('user', JSON.stringify(data.data));
+        const role = normalizeRole(data.data.role);
+        data.data.role = role;
+
+        clearStoredSession();
+        persistUserSession({ ...data.data, role });
 
         setIsSuccessLoading(true);
         setTimeout(() => {
-          let dashPath = `/dashboard/${data.data.role}`;
+          let dashPath = `/dashboard/${role}`;
 
           if (validRole === 'mentor' && mentorLoginAs === 'faculty') {
             dashPath = '/dashboard/faculty';
           }
 
-          if (data.data.role === 'student' && !data.data.profile_completed) {
+          if (role === 'student' && !data.data.profile_completed) {
             navigate('/complete-profile');
           } else {
             navigate(dashPath);

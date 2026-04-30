@@ -1,0 +1,41 @@
+{% extends "faculty_base.html" %}
+{% set title = "Mentor Dashboard" %}
+
+{% block content %}
+  <div class="flex items-start justify-between gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-display font-bold">Mentor Dashboard</h1>
+      <p class="text-slate-400 text-sm">Quick actions for mentoring work.</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="/mentor/certificates" class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-semibold">
+        View Certificates
+      </a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <a href="/mentor/certificates" class="block p-5 rounded-2xl bg-slate-900/40 border border-white/10 hover:border-primary/40">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm text-slate-400">Students</div>
+          <div class="text-lg font-bold">Certificates</div>
+        </div>
+        <span class="material-symbols-outlined text-primary">workspace_premium</span>
+      </div>
+      <div class="text-xs text-slate-500 mt-2">View certificates uploaded by your mentees.</div>
+    </a>
+
+    <div class="p-5 rounded-2xl bg-slate-900/40 border border-white/10">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm text-slate-400">Status</div>
+          <div class="text-lg font-bold">Logged in</div>
+        </div>
+        <span class="material-symbols-outlined text-slate-300">verified_user</span>
+      </div>
+      <div class="text-xs text-slate-500 mt-2">Use the switch button in the navbar to change role.</div>
+    </div>
+  </div>
+{% endblock %}
+

@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from "sonner";
 import {    Lock, User } from "lucide-react";
 import { NotebookLoader } from "@/components/ui/NotebookLoader";
+import { clearStoredSession, normalizeRole, persistUserSession } from "@/lib/authSession";
 const AdminLoginPage = () => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
@@ -34,12 +35,12 @@ const AdminLoginPage = () => {
 
             if (data.success) {
                 toast.success("Login successful!");
-                // Store user info
-                localStorage.setItem("user", JSON.stringify(data.data));
-                localStorage.setItem("role", data.data.role.toLowerCase()); // admin, hod, mentor, etc.
+                const role = normalizeRole(data.data.role);
+                data.data.role = role;
 
-                // Redirect based on role
-                const role = data.data.role.toLowerCase();
+                clearStoredSession();
+                persistUserSession({ ...data.data, role });
+
                 navigate(`/dashboard/${role}`);
             } else {
                 toast.error(data.message || "Login failed");

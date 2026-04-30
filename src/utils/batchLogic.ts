@@ -20,6 +20,10 @@ export const getCourseDuration = (dept: string | null, admNo: string = ''): numb
     return 4; // Default to 4 (B.Tech etc)
 };
 
+const getBatchEndYear = (startYear: number, duration: number, prefix: string = ''): number => {
+    return startYear + duration;
+};
+
 export const getBatchFromAdmissionNumber = (admNo: string, dept: string | null): string => {
     if (!admNo) return '';
     const match = admNo.match(/^A?(\d{2})/i);
@@ -27,7 +31,7 @@ export const getBatchFromAdmissionNumber = (admNo: string, dept: string | null):
         const yearShort = parseInt(match[1]);
         const startYear = 2000 + yearShort;
         const duration = getCourseDuration(dept, admNo);
-        const endYear = startYear + duration;
+        const endYear = getBatchEndYear(startYear, duration, dept || admNo);
         return `${startYear}-${endYear}`;
     }
     return '';
@@ -38,6 +42,7 @@ export const generateBatchOptions = (dept: string | null, extraYears: number = 0
 
     const d = dept.toUpperCase();
     const batches: string[] = [];
+    const currentYear = new Date().getFullYear() - 1;
 
     // 1. Basic Sciences & Humanities -> No Mentoring -> Return Empty
     if (d === 'BASIC SCIENCES & HUMANITIES') {
@@ -48,16 +53,16 @@ export const generateBatchOptions = (dept: string | null, extraYears: number = 0
     if (d === 'DEPARTMENT OF COMPUTER APPLICATIONS' || d === 'MCA' || d === 'IMCA') {
         const mcaDuration = 2;
         const imcaDuration = 5;
-        const maxYear = 2025 + extraYears;
+        const maxYear = currentYear + extraYears;
 
         // MCA: Starts 2024 for Active. (Allow shift for new batches)
         for (let y = 2024 + shiftStart; y <= maxYear; y++) {
-            batches.push(`MCA ${y}-${y + mcaDuration}`);
+            batches.push(`MCA ${y}-${getBatchEndYear(y, mcaDuration, 'MCA')}`);
         }
 
         // IMCA: Starts 2024.
         for (let y = 2024 + shiftStart; y <= maxYear; y++) {
-            batches.push(`IMCA ${y}-${y + imcaDuration}`);
+            batches.push(`IMCA ${y}-${getBatchEndYear(y, imcaDuration, 'IMCA')}`);
         }
 
         return batches.sort();
@@ -66,7 +71,7 @@ export const generateBatchOptions = (dept: string | null, extraYears: number = 0
     // 3. MBA -> Starts 2024
     if (d.includes('MBA') || d.includes('BUSINESS')) {
         const duration = 2;
-        const maxYear = 2025 + extraYears;
+        const maxYear = currentYear + extraYears;
         for (let y = 2024 + shiftStart; y <= maxYear; y++) {
             batches.push(`${y}-${y + duration}`);
         }
@@ -77,7 +82,7 @@ export const generateBatchOptions = (dept: string | null, extraYears: number = 0
     let duration = 4;
     if (d.includes('M.TECH') || d.includes('MSC')) duration = 2;
 
-    const maxYear = 2025 + extraYears;
+    const maxYear = currentYear + extraYears;
 
     // B.Tech starts 2022 normally. 
     // If shiftStart > 0 (Add Next Batch pressed), we shift window forward:

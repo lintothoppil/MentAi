@@ -1,4 +1,4 @@
-# MentorAI - Student Module
+# MentAi - Student Module
 
 A complete student management system with registration, profile management, and authentication features.
 

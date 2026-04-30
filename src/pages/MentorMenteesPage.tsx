@@ -4,7 +4,7 @@ import {
     Users, Search, Filter, TrendingUp, AlertTriangle, CheckCircle,
     MoreHorizontal, Calendar, LayoutDashboard, X, Video, MapPin,
     Link2, Phone, Mail, BookOpen, Home, GraduationCap, Clock,
-    ChevronRight, ExternalLink, Edit3, UserCheck, Activity
+    ChevronRight, ExternalLink, Edit3, UserCheck, Activity, FileText, Shield
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,8 @@ const navItems = [
     { label: "My Mentees", icon: <Users className="h-4 w-4" />,           path: "/dashboard/mentor/mentees", isActive: true },
     { label: "Sessions",   icon: <Calendar className="h-4 w-4" />,        path: "/dashboard/mentor/sessions" },
     { label: "Timetable",  icon: <Calendar className="h-4 w-4" />,        path: "/dashboard/faculty/timetable" },
+    { label: "Academics",  icon: <BookOpen className="h-4 w-4" />,        path: "/dashboard/mentor/academics" },
+    { label: "AI Reports", icon: <TrendingUp className="h-4 w-4" />,      path: "/dashboard/mentor/ai-reports" },
     { label: "Reports",    icon: <TrendingUp className="h-4 w-4" />,      path: "/dashboard/mentor/reports" },
 ];
 
@@ -184,7 +186,7 @@ const SessionModal = ({
                         Schedule Mentoring Session
                     </DialogTitle>
                     <DialogDescription>
-                        For <strong>{student.name}</strong> · {student.student_id || student.admission_number}
+                        For <strong>{student.name}</strong> · {student.academic_info?.program || student.program || "Student"} · Sem {student.academic_info?.current_semester || student.current_semester || "—"} · {student.student_id || student.admission_number}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -342,7 +344,12 @@ const StudentDetailSheet = ({
 }) => {
     const [detail, setDetail] = useState<any>(null);
     const [loading, setLoading] = useState(false);
+    const [marks, setMarks] = useState<any[]>([]);
     const [sessionActionLoading, setSessionActionLoading] = useState<number | null>(null);
+    const [privateNotes, setPrivateNotes] = useState<any[]>([]);
+    const [noteType, setNoteType] = useState("private");
+    const [noteContent, setNoteContent] = useState("");
+    const [savingNote, setSavingNote] = useState(false);
 
     const handleSessionAction = (sessionId: number, action: string, extraData: any = {}) => {
         setSessionActionLoading(sessionId);
@@ -382,14 +389,87 @@ const StudentDetailSheet = ({
         if (!studentId || !open) return;
         setLoading(true);
         setDetail(null);
+        setPrivateNotes([]);
         fetch(`http://localhost:5000/api/student/detail/${studentId}`)
             .then(r => r.json())
-            .then(d => { if (d.success) setDetail(d.data); else toast.error(d.message); })
+            .then(d => {
+                if (d.success) {
+                    setDetail(d.data);
+                    fetchMarks(studentId);
+                    fetchPrivateNotes(studentId);
+                } else toast.error(d.message);
+            })
             .catch(() => toast.error("Failed to load student details"))
             .finally(() => setLoading(false));
     }, [studentId, open]);
 
-    const info = detail;
+
+    const fetchMarks = async (sid: string) => {
+        try {
+            const res = await fetch(`http://localhost:5000/api/student/marks/${sid}`);
+            const d = await res.json();
+            if (d.success) setMarks(d.data);
+        } catch {}
+    };
+
+    const fetchPrivateNotes = async (sid: string) => {
+        try {
+            const res = await fetch(`http://localhost:5000/api/mentor/private-notes/${sid}?mentor_id=${mentorId}`);
+            const d = await res.json();
+            if (d.success) setPrivateNotes(d.data);
+        } catch {}
+    };
+
+    const handleSavePrivateNote = async () => {
+        if (!studentId || !noteContent.trim()) {
+            toast.error("Please write a note first");
+            return;
+        }
+
+        setSavingNote(true);
+        try {
+            const res = await fetch("http://localhost:5000/api/mentor/private-notes", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    mentor_id: mentorId,
+                    student_id: studentId,
+                    note_type: noteType,
+                    content: noteContent.trim(),
+                }),
+            });
+            const d = await res.json();
+            if (d.success) {
+                toast.success("Private mentor note saved");
+                setNoteContent("");
+                setNoteType("private");
+                fetchPrivateNotes(studentId);
+            } else {
+                toast.error(d.message || "Failed to save note");
+            }
+        } catch {
+            toast.error("Failed to save note");
+        } finally {
+            setSavingNote(false);
+        }
+    };
+
+    const handleVerifyMarks = async (sem: number, action: 'verify' | 'unlock' = 'verify') => {
+        try {
+            const res = await fetch(`http://localhost:5000/api/mentor/marks/verify/${studentId}/${sem}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action })
+            });
+            const d = await res.json();
+            if (d.success) {
+                toast.success(d.message);
+                fetchMarks(studentId!);
+            } else toast.error(d.message);
+        } catch { toast.error("Verification failed"); }
+    };
+
+        const info = detail;
     const analytics = info?.analytics;
 
     return (
@@ -492,8 +572,128 @@ const StudentDetailSheet = ({
 
                         <Separator />
 
+                        <div className="p-4 space-y-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Mentor Private Notes</p>
+                                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <Shield className="h-3 w-3" /> Visible only to the assigned mentor until the student moves to alumni.
+                                    </p>
+                                </div>
+                                <Badge variant="outline" className="text-[10px]">
+                                    {privateNotes.length} note{privateNotes.length === 1 ? "" : "s"}
+                                </Badge>
+                            </div>
+
+                            <div className="grid gap-3 rounded-2xl border border-mentor/20 bg-mentor/5 p-3">
+                                <div className="grid gap-2 sm:grid-cols-[160px_1fr]">
+                                    <div className="grid gap-2">
+                                        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Note Type</Label>
+                                        <Select value={noteType} onValueChange={setNoteType}>
+                                            <SelectTrigger className="h-10 bg-background">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="private">Private Follow-up</SelectItem>
+                                                <SelectItem value="session">Session Record</SelectItem>
+                                                <SelectItem value="abnormality">Abnormality</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label className="text-xs uppercase tracking-wider text-muted-foreground">New Note</Label>
+                                        <Textarea
+                                            value={noteContent}
+                                            onChange={(e) => setNoteContent(e.target.value)}
+                                            placeholder="Record mentoring discussion, behaviour changes, abnormality, or private follow-up points..."
+                                            className="min-h-[110px] bg-background"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end">
+                                    <Button className="bg-mentor hover:bg-mentor/90 text-white gap-2" onClick={handleSavePrivateNote} disabled={savingNote}>
+                                        <FileText className="h-4 w-4" />
+                                        {savingNote ? "Saving..." : "Save Private Note"}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                {privateNotes.length === 0 ? (
+                                    <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                                        No private notes yet for this mentee.
+                                    </div>
+                                ) : (
+                                    privateNotes.map((note) => (
+                                        <div key={note.id} className="rounded-2xl border bg-background p-3 shadow-sm">
+                                            <div className="flex items-center justify-between gap-3 mb-2">
+                                                <Badge variant="secondary" className="capitalize">{note.note_type}</Badge>
+                                                <span className="text-[11px] text-muted-foreground">
+                                                    {note.created_at ? new Date(note.created_at).toLocaleString("en-IN") : "Just now"}
+                                                </span>
+                                            </div>
+                                            <p className="text-sm leading-6 whitespace-pre-wrap">{note.content}</p>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        <Separator />
+
                         {/* Contact Info */}
                         <div className="p-4">
+                            
+                        {/* University Marks Authorization */}
+                        {marks.length > 0 && (
+                            <>
+                                <Separator />
+                                <div className="p-4">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-3 flex items-center gap-2">
+                                        <GraduationCap className="h-3 w-3" /> University Mark Verification
+                                    </p>
+                                    <div className="space-y-4">
+                                        {[...new Set(marks.map(m => m.semester))].sort().map(sem => {
+                                            const semMarks = marks.filter((m: any) => m.semester === sem);
+                                            const allVerified = semMarks.every((m: any) => m.is_verified);
+                                            return (
+                                                <div key={sem} className="p-3 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/30 dark:bg-indigo-950/10">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <p className="text-xs font-black text-indigo-950 dark:text-white uppercase">Semester {sem}</p>
+                                                        {allVerified ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge className="bg-emerald-500 text-white border-0 text-[10px]">Authorized</Badge>
+                                                                <Button size="sm" variant="ghost" className="h-6 text-[10px] text-muted-foreground" onClick={() => handleVerifyMarks(Number(sem), 'unlock')}>Unlock</Button>
+                                                            </div>
+                                                        ) : (
+                                                            <Button 
+                                                                size="sm" 
+                                                                className="h-7 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black rounded-lg"
+                                                                onClick={() => handleVerifyMarks(Number(sem))}
+                                                            >
+                                                                Verify & Authorize
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {semMarks.map((m: any, idx: number) => (
+                                                            <div key={idx} className="flex items-center gap-2 px-2 py-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 text-[10px]">
+                                                                <span className="font-bold text-slate-600 dark:text-slate-400">{m.university_grade || m.university_mark || '—'}</span>
+                                                                <span className="text-slate-400">·</span>
+                                                                <span className="truncate max-w-[120px] font-semibold" title={`${m.course_name || m.display_name || m.subject_code} (${m.subject_code})`}>
+                                                                    {m.course_name || m.display_name || m.subject_code}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Contact Information</p>
                             <div className="space-y-2 text-sm">
                                 {info.email && (
@@ -712,12 +912,149 @@ const StudentDetailSheet = ({
 };
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
+const MenteeNotepadModal = ({
+    open, onClose, student, mentorId
+}: {
+    open: boolean; onClose: () => void; student: any; mentorId: string;
+}) => {
+    const [notes, setNotes] = useState<any[]>([]);
+    const [noteType, setNoteType] = useState("private");
+    const [content, setContent] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        if (!open || !student?.student_id) return;
+        setLoading(true);
+        fetch(`http://localhost:5000/api/mentor/private-notes/${student.student_id}?mentor_id=${mentorId}`)
+            .then((r) => r.json())
+            .then((d) => {
+                if (d.success) setNotes(d.data);
+                else toast.error(d.message || "Failed to load notes");
+            })
+            .catch(() => toast.error("Failed to load notes"))
+            .finally(() => setLoading(false));
+    }, [open, student?.student_id, mentorId]);
+
+    const saveNote = async () => {
+        if (!student?.student_id || !content.trim()) {
+            toast.error("Please write a note");
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const res = await fetch("http://localhost:5000/api/mentor/private-notes", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    mentor_id: mentorId,
+                    student_id: student.student_id,
+                    note_type: noteType,
+                    content: content.trim(),
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setNotes((prev) => [data.data, ...prev]);
+                setContent("");
+                toast.success("Notepad saved");
+            } else {
+                toast.error(data.message || "Failed to save note");
+            }
+        } catch {
+            toast.error("Failed to save note");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onClose}>
+            <DialogContent className="sm:max-w-[760px]">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-mentor" />
+                        Mentor Notepad
+                    </DialogTitle>
+                    <DialogDescription>
+                        Separate private notebook for <strong>{student?.name || "this mentee"}</strong>. Notes are permanent and visible only to the assigned mentor.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="grid gap-4 md:grid-cols-[240px_1fr] py-2">
+                    <div className="grid gap-2">
+                        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Note Category</Label>
+                        <Select value={noteType} onValueChange={setNoteType}>
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="private">General Progress</SelectItem>
+                                <SelectItem value="session">Session Follow-up</SelectItem>
+                                <SelectItem value="abnormality">Weakness / Concern</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <div className="rounded-xl border border-mentor/20 bg-mentor/5 p-3 text-xs text-muted-foreground">
+                            Use this pad to track progression, weaknesses, behaviour, and follow-up points for this mentee.
+                        </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Write Note</Label>
+                        <Textarea
+                            value={content}
+                            onChange={(e) => setContent(e.target.value)}
+                            placeholder="Record progression, weak areas, mentoring action plan, or anything important for this mentee..."
+                            className="min-h-[140px]"
+                        />
+                    </div>
+                </div>
+
+                <div className="rounded-2xl border bg-muted/20 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <p className="text-sm font-bold">Saved Notes</p>
+                        <Badge variant="outline">{notes.length}</Badge>
+                    </div>
+                    <div className="max-h-[320px] overflow-y-auto space-y-3 pr-1">
+                        {loading ? (
+                            <p className="text-sm text-muted-foreground">Loading notes...</p>
+                        ) : notes.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No notes saved for this mentee yet.</p>
+                        ) : (
+                            notes.map((note) => (
+                                <div key={note.id} className="rounded-xl border bg-background p-3">
+                                    <div className="flex items-center justify-between gap-3 mb-2">
+                                        <Badge variant="secondary" className="capitalize">{note.note_type}</Badge>
+                                        <span className="text-[11px] text-muted-foreground">
+                                            {note.created_at ? new Date(note.created_at).toLocaleString("en-IN") : ""}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm whitespace-pre-wrap leading-6">{note.content}</p>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" onClick={onClose}>Close</Button>
+                    <Button className="bg-mentor hover:bg-mentor/90 text-white" onClick={saveNote} disabled={saving}>
+                        {saving ? "Saving..." : "Save to Notepad"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 const MentorMenteesPage = () => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     // Supports both faculty login (faculty_id) and any fallback (id)
     const mentorUserId = String(user.faculty_id || user.id || "");
     const [mentees, setMentees] = useState<any[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
+    const [activeTab, setActiveTab] = useState("active");
     const [filterStatus, setFilterStatus] = useState("all");
     const [loading, setLoading] = useState(true);
     const [plannerStats, setPlannerStats] = useState<any>({});
@@ -730,6 +1067,8 @@ const MentorMenteesPage = () => {
     // Session Modal
     const [sessionStudent, setSessionStudent] = useState<any>(null);
     const [sessionOpen, setSessionOpen]       = useState(false);
+    const [notepadStudent, setNotepadStudent] = useState<any>(null);
+    const [notepadOpen, setNotepadOpen]       = useState(false);
 
     // Intervention Modal
     const [interventionOpen, setInterventionOpen]             = useState(false);
@@ -800,8 +1139,14 @@ const MentorMenteesPage = () => {
         setSessionOpen(true);
         setDetailOpen(false); // close drawer if open
     };
+    const openNotepad = (student: any) => {
+        setNotepadStudent(student);
+        setNotepadOpen(true);
+    };
 
-    const filteredMentees = mentees.filter(m => {
+    const targetMentees = mentees.filter(m => activeTab === 'active' ? m.status !== 'Passed Out' : m.status === 'Passed Out');
+    
+    const filteredMentees = targetMentees.filter(m => {
         const matchesSearch =
             m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             m.student_id.toLowerCase().includes(searchTerm.toLowerCase());
@@ -814,9 +1159,9 @@ const MentorMenteesPage = () => {
         return matchesSearch && matchesFilter;
     }).sort((a, b) => (b.adjusted_risk || 0) - (a.adjusted_risk || 0));
 
-    const criticalCount  = mentees.filter(m => (m.adjusted_risk || 0) >= 70).length;
-    const atRiskCount    = mentees.filter(m => { const r = m.adjusted_risk || 0; return r >= 40 && r < 70; }).length;
-    const stableCount    = mentees.filter(m => (m.adjusted_risk || 0) < 40).length;
+    const criticalCount  = targetMentees.filter(m => (m.adjusted_risk || 0) >= 70).length;
+    const atRiskCount    = targetMentees.filter(m => { const r = m.adjusted_risk || 0; return r >= 40 && r < 70; }).length;
+    const stableCount    = targetMentees.filter(m => (m.adjusted_risk || 0) < 40).length;
 
     return (
         <DashboardLayout role="mentor" roleLabel="Mentor Dashboard" navItems={navItems} gradientClass="gradient-mentor">
@@ -827,7 +1172,7 @@ const MentorMenteesPage = () => {
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">Mentee Directory</h1>
                         <p className="text-muted-foreground">
-                            {mentees.length} students assigned · {criticalCount} critical · {atRiskCount} at-risk
+                            {targetMentees.length} {activeTab === 'active' ? 'active mentees' : 'alumni'} assigned · {criticalCount} critical · {atRiskCount} at-risk
                         </p>
                     </div>
                     <Button
@@ -836,6 +1181,12 @@ const MentorMenteesPage = () => {
                     >
                         <Calendar className="h-4 w-4" /> View All Sessions
                     </Button>
+                </motion.div>
+
+                {/* Tabs */}
+                <motion.div {...anim(1)} className="flex gap-2 bg-muted/40 p-1 w-fit rounded-xl">
+                    <button onClick={() => setActiveTab('active')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'active' ? 'bg-white dark:bg-slate-800 shadow-sm text-mentor' : 'text-muted-foreground hover:text-foreground'}`}>Active Mentees</button>
+                    <button onClick={() => setActiveTab('alumni')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'alumni' ? 'bg-white dark:bg-slate-800 shadow-sm text-mentor' : 'text-muted-foreground hover:text-foreground'}`}>Alumni / Passed Out</button>
                 </motion.div>
 
                 {/* Summary Stats */}
@@ -921,7 +1272,9 @@ const MentorMenteesPage = () => {
                                                             </h3>
                                                             <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 group-hover:text-mentor transition-colors" />
                                                         </div>
-                                                        <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider">{student.student_id} · {student.batch}</p>
+                                                        <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider">
+                                                            {student.academic_info?.program || "N/A"} · {student.student_id} · {student.batch} · Sem {student.academic_info?.current_semester || "—"}
+                                                        </p>
                                                         <div className="flex gap-2 mt-2 flex-wrap">
                                                             <Badge variant={student.status === "Declining" ? "destructive" : student.status === "Improving" ? "default" : "secondary"}
                                                                 className={student.status === "Improving" ? "bg-green-600 text-white" : ""}>
@@ -973,9 +1326,16 @@ const MentorMenteesPage = () => {
                                                     <Button
                                                         variant="outline"
                                                         className="w-full gap-1 text-xs border-mentor/30 text-mentor hover:bg-mentor/10 hover:border-mentor"
-                                                        onClick={() => openSession({ student_id: student.student_id, name: student.name, photo_url: null })}
+                                                        onClick={() => openSession(student)}
                                                     >
                                                         <Calendar className="h-3.5 w-3.5" /> Schedule Session
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        className="w-full gap-1 text-xs border-slate-300 text-slate-700 hover:bg-slate-50"
+                                                        onClick={() => openNotepad(student)}
+                                                    >
+                                                        <FileText className="h-3.5 w-3.5" /> Open Notepad
                                                     </Button>
                                                     {risk >= 70 && !loggedInterventions[student.student_id] ? (
                                                         <Button
@@ -996,8 +1356,11 @@ const MentorMenteesPage = () => {
                                                                 <DropdownMenuItem onClick={() => openDetail(student.student_id)}>
                                                                     <UserCheck className="h-4 w-4 mr-2" /> Full Profile
                                                                 </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => openSession({ student_id: student.student_id, name: student.name, photo_url: null })}>
+                                                                <DropdownMenuItem onClick={() => openSession(student)}>
                                                                     <Video className="h-4 w-4 mr-2" /> Online Session
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => openNotepad(student)}>
+                                                                    <FileText className="h-4 w-4 mr-2" /> Private Notepad
                                                                 </DropdownMenuItem>
                                                                 {risk >= 70 && (
                                                                     <DropdownMenuItem
@@ -1038,6 +1401,13 @@ const MentorMenteesPage = () => {
                 student={sessionStudent}
                 mentorId={mentorUserId}
                 onBooked={fetchAllData}
+            />
+
+            <MenteeNotepadModal
+                open={notepadOpen}
+                onClose={() => setNotepadOpen(false)}
+                student={notepadStudent}
+                mentorId={mentorUserId}
             />
 
             {/* Intervention Modal */}

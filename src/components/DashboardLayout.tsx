@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Menu, LogOut, Bell, Search, ChevronRight, LayoutDashboard,
@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Logo } from "@/components/layout/Logo";
 import { cn } from "@/lib/utils";
+import { clearStoredSession, getAllowedRoles, hasRole, normalizeRole, persistUserSession } from "@/lib/authSession";
 
 interface NavItem {
     label: string;
@@ -221,15 +222,16 @@ const DashboardLayout = ({
     children, role, roleLabel, navItems, gradientClass
 }: DashboardLayoutProps) => {
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [user, setUser] = useState(() => {
         try { return JSON.parse(localStorage.getItem("user") || "{}"); }
         catch { return {}; }
     });
+    const [switchingRole, setSwitchingRole] = useState<string | null>(null);
 
     useEffect(() => {
         if (!localStorage.getItem("user")) navigate("/login");
-        // Re-read user when StudentDashboard patches localStorage with correct name
         const handleStorage = () => {
             try {
                 const u = JSON.parse(localStorage.getItem("user") || "{}");
@@ -237,9 +239,13 @@ const DashboardLayout = ({
             } catch { /* ignore */ }
         };
         window.addEventListener("storage", handleStorage);
-        // Also poll once after 2s so same-tab patches (from StudentDashboard) are caught
+        window.addEventListener("auth-session-changed", handleStorage);
         const t = setTimeout(handleStorage, 2000);
-        return () => { window.removeEventListener("storage", handleStorage); clearTimeout(t); };
+        return () => {
+            window.removeEventListener("storage", handleStorage);
+            window.removeEventListener("auth-session-changed", handleStorage);
+            clearTimeout(t);
+        };
     }, [navigate]);
 
     if (!user || !localStorage.getItem("user")) return null;
@@ -250,9 +256,53 @@ const DashboardLayout = ({
 
     const isStudent = role === "student";
     const admNo = user.admission_number || "";
+    const activeRole = normalizeRole(user.role || role);
+    const allowedRoles = getAllowedRoles(user);
+    const canUseFacultyWorkspace = !isStudent && role !== "admin" && (allowedRoles.length > 0 || ["faculty", "mentor", "hod", "subject-handler"].includes(activeRole));
+
+    const switchRole = async (targetRole: string) => {
+        const normalizedTarget = normalizeRole(targetRole);
+        if (!normalizedTarget || normalizedTarget === activeRole) return;
+
+        if (normalizedTarget === "faculty") {
+            persistUserSession({ ...user, role: "faculty" });
+            setUser((prev: Record<string, unknown>) => ({ ...prev, role: "faculty" }));
+            navigate("/dashboard/faculty");
+            return;
+        }
+
+        setSwitchingRole(normalizedTarget);
+        try {
+            const response = await fetch("http://localhost:5000/api/faculty/switch-role", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                credentials: "include",
+                body: JSON.stringify({ role: normalizedTarget }),
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || "Unable to switch role");
+            }
+
+            const nextUser = {
+                ...user,
+                role: normalizeRole(data.data?.role || normalizedTarget),
+                allowed_roles: data.data?.allowed_roles || allowedRoles,
+            };
+            persistUserSession(nextUser);
+            setUser(nextUser);
+            navigate(`/dashboard/${nextUser.role}`);
+        } catch (error) {
+            console.error("Role switch failed:", error);
+        } finally {
+            setSwitchingRole(null);
+        }
+    };
 
     const handleLogout = () => {
-        localStorage.removeItem("user");
+        clearStoredSession();
         navigate("/");
     };
 
@@ -269,23 +319,32 @@ const DashboardLayout = ({
 
             <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
                 {navItems.map((item, index) => (
-                    <Link
-                        key={index}
-                        to={item.path}
-                        className={cn(
-                            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group",
-                            "hover:bg-accent/10 hover:text-accent",
-                            item.isActive ? "bg-accent/10 text-accent shadow-sm" : "text-muted-foreground"
-                        )}
-                    >
-                        <span className={cn(
-                            "p-1 rounded-md transition-colors",
-                            item.isActive ? "bg-accent text-white" : "text-muted-foreground group-hover:text-accent"
-                        )}>
-                            {item.icon}
-                        </span>
-                        {item.label}
-                    </Link>
+                    (() => {
+                        const active = location.pathname === item.path || (item.path !== "/" && location.pathname.startsWith(`${item.path}/`));
+                        return (
+                            <Link
+                                key={index}
+                                to={item.path}
+                                className={cn(
+                                    "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all group relative overflow-hidden mb-1",
+                                    active
+                                        ? "bg-indigo-600 text-white shadow-[0_10px_20px_rgba(79,70,229,0.2)]"
+                                        : "text-slate-500 hover:bg-slate-50 hover:text-indigo-600"
+                                )}
+                            >
+                                <span className={cn(
+                                    "p-1.5 rounded-lg transition-colors flex items-center justify-center",
+                                    active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600"
+                                )}>
+                                    {item.icon}
+                                </span>
+                                {item.label}
+                                {active && (
+                                    <motion.div layoutId="nav-active" className="absolute right-0 top-0 bottom-0 w-1 bg-white/40" />
+                                )}
+                            </Link>
+                        );
+                    })()
                 ))}
             </nav>
 
@@ -302,9 +361,9 @@ const DashboardLayout = ({
     );
 
     return (
-        <div className="min-h-screen bg-muted/30 flex">
+        <div className="min-h-screen bg-white flex">
             {/* Desktop Sidebar */}
-            <aside className="hidden lg:block w-72 border-r border-border bg-card fixed h-full z-30">
+            <aside className="hidden lg:block w-72 border-r border-slate-100 bg-white fixed h-full z-30">
                 <SidebarContent />
             </aside>
 
@@ -375,9 +434,34 @@ const DashboardLayout = ({
                                     </div>
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => navigate(`/dashboard/${role}/profile`)}>
+                                <DropdownMenuItem onClick={() => navigate(
+                                    role === "subject-handler"
+                                        ? "/dashboard/subject-handler/manage"
+                                        : `/dashboard/${role}/profile`
+                                )}>
                                     Profile
                                 </DropdownMenuItem>
+                                {(canUseFacultyWorkspace || allowedRoles.length > 0) && <DropdownMenuSeparator />}
+                                {canUseFacultyWorkspace && (
+                                    <DropdownMenuItem onClick={() => switchRole("faculty")}>
+                                        {activeRole === "faculty" ? "Faculty Workspace" : "Switch to Faculty"}
+                                    </DropdownMenuItem>
+                                )}
+                                {hasRole(user, "mentor") && (
+                                    <DropdownMenuItem disabled={switchingRole === "mentor"} onClick={() => switchRole("mentor")}>
+                                        {switchingRole === "mentor" ? "Switching to Mentor..." : "Switch to Mentor"}
+                                    </DropdownMenuItem>
+                                )}
+                                {hasRole(user, "subject-handler") && (
+                                    <DropdownMenuItem disabled={switchingRole === "subject-handler"} onClick={() => switchRole("subject-handler")}>
+                                        {switchingRole === "subject-handler" ? "Switching to Subject Handler..." : "Switch to Subject Handler"}
+                                    </DropdownMenuItem>
+                                )}
+                                {hasRole(user, "hod") && (
+                                    <DropdownMenuItem disabled={switchingRole === "hod"} onClick={() => switchRole("hod")}>
+                                        {switchingRole === "hod" ? "Switching to HOD..." : "Switch to HOD"}
+                                    </DropdownMenuItem>
+                                )}
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleLogout}>
                                     Log out

@@ -18,7 +18,7 @@ from utils.decorators import login_required, role_required
 from utils.validators  import parse_admission_number, validate_admission_format
 from services.bulk_upload     import bulk_upload_faculty
 from services.mentor_allocation import preview_allocation, confirm_allocation
-from services.batch_service   import promote_expired_batches_to_alumni
+from services.batch_service   import promote_expired_batches_to_alumni, is_mentor_eligible, rebalance_department_batches
 
 admin_bp = Blueprint('admin_routes', __name__, url_prefix='/admin')
 
@@ -249,19 +249,35 @@ def get_grouped_faculty():
 def update_faculty(faculty_id):
     f    = Faculty.query.filter_by(username=faculty_id).first_or_404()
     data = request.get_json(force=True) or {}
+    old_status = f.status
+    old_department = f.department
+    old_is_hod = bool(f.is_hod)
+    affected_batch_ids = sorted({
+        s.batch_id for s in Student.query.filter_by(mentor_id=f.id, status='Live').all()
+        if s.batch_id is not None
+    })
+
     for field in ('name', 'email', 'designation', 'status', 'is_hod', 'is_subject_handler'):
         if field in data:
             setattr(f, field, data[field])
-    # Recalculate mentor eligibility
-    f.is_mentor_eligible = (
-        f.status == 'Live' and
-        f.designation not in ('HOD', 'Lab Assistant', 'Admin') and
-        f.department not in ('BSH', 'Basic Science and Humanities', 'Basic Sciences & Humanities') and
-        not f.is_hod
+
+    f.is_mentor_eligible = is_mentor_eligible(f)
+    db.session.flush()
+
+    needs_rebalance = (
+        old_status != f.status
+        or old_department != f.department
+        or old_is_hod != bool(f.is_hod)
+        or not f.is_mentor_eligible
     )
+    rebalance_result = rebalance_department_batches(old_department, affected_batch_ids) if needs_rebalance else None
+
     db.session.commit()
     return jsonify({'status': 'ok', 'data': {
-        'faculty_id': f.username, 'name': f.name, 'is_mentor_eligible': f.is_mentor_eligible,
+        'faculty_id': f.username,
+        'name': f.name,
+        'is_mentor_eligible': f.is_mentor_eligible,
+        'rebalanced_batches': rebalance_result.get('processed_batches', []) if rebalance_result else [],
     }}), 200
 
 
@@ -405,8 +421,9 @@ def create_batch():
     if not c:
         return jsonify({'status': 'error', 'message': 'Course not found'}), 404
 
+    end_year = start_year + c.duration_years
     b = Batch(course_id=course_id, start_year=start_year,
-              end_year=start_year + c.duration_years, status='active')
+              end_year=end_year, status='active')
     db.session.add(b)
     db.session.commit()
     return jsonify({'status': 'ok', 'data': {'batch_id': b.id, 'start_year': start_year,

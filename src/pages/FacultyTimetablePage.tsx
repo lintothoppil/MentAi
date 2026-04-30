@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {  Calendar, Clock, AlertCircle, LayoutDashboard, Users, FileText, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { NotebookLoader } from "@/components/ui/NotebookLoader";
+import { hasRole, normalizeRole } from "@/lib/authSession";
 
 interface TimetableEntry {
     day: string;
@@ -20,12 +21,29 @@ const FacultyTimetablePage = () => {
     const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Dynamic Navigation based on role would be better, but hardcoding for now
-    const navItems = [
-        { label: "Overview", icon: <LayoutDashboard className="h-4 w-4" />, path: `/dashboard/${user.role}` },
-        { label: "My Timetable", icon: <Calendar className="h-4 w-4" />, path: "/dashboard/faculty/timetable", isActive: true },
-        // Add other items relevant to faculty
+    const activeRole = normalizeRole(user.role || user.designation || 'faculty');
+    const isMentor = hasRole(user, "mentor");
+    const isHandler = hasRole(user, "subject-handler");
+    const baseRole = activeRole || 'faculty';
+    
+    // Mentor nav items
+    const mentorNavItems = [
+        { label: "Overview", icon: <LayoutDashboard className="h-4 w-4" />, path: "/dashboard/mentor" },
+        { label: "My Mentees", icon: <Users className="h-4 w-4" />, path: "/dashboard/mentor/mentees" },
+        { label: "Sessions", icon: <Calendar className="h-4 w-4" />, path: "/dashboard/mentor/sessions" },
+        { label: "Timetable", icon: <Calendar className="h-4 w-4" />, path: "/dashboard/faculty/timetable", isActive: true },
+        { label: "Academics", icon: <BookOpen className="h-4 w-4" />, path: "/dashboard/mentor/academics" },
+        { label: "Reports", icon: <FileText className="h-4 w-4" />, path: "/dashboard/mentor/reports" },
     ];
+
+    // Regular faculty nav items
+    const facultyNavItems = [
+        { label: "Overview", icon: <LayoutDashboard className="h-4 w-4" />, path: `/dashboard/${baseRole}` },
+        { label: "My Timetable", icon: <Calendar className="h-4 w-4" />, path: "/dashboard/faculty/timetable", isActive: true },
+        ...(isHandler ? [{ label: "Subject Handler", icon: <BookOpen className="h-4 w-4" />, path: "/dashboard/subject-handler/manage" }] : [])
+    ];
+
+    const navItems = isMentor ? mentorNavItems : facultyNavItems;
 
     useEffect(() => {
         if (user.id) {
@@ -57,12 +75,14 @@ const FacultyTimetablePage = () => {
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     const periods = [1, 2, 3, 4, 5, 6, 7];
 
-    const getEntry = (day: string, period: number) => {
-        return timetable.find(t => t.day.toLowerCase() === day.toLowerCase() && t.period === period);
+    const getEntries = (day: string, period: number) => {
+        return (Array.isArray(timetable) ? timetable : [])
+            .filter(t => t.day?.toLowerCase() === day.toLowerCase() && t.period === period)
+            .sort((a, b) => String(a.batch || "").localeCompare(String(b.batch || "")) || String(a.subject || "").localeCompare(String(b.subject || "")));
     };
 
     return (
-        <DashboardLayout role={user.role || 'mentor'} roleLabel={`${user.role} Dashboard`} navItems={navItems} gradientClass={`gradient-${user.role}`}>
+        <DashboardLayout role={baseRole} roleLabel={`${baseRole} Dashboard`} navItems={navItems} gradientClass={`gradient-${baseRole}`}>
             <div className="space-y-6">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight">My Teaching Schedule</h2>
@@ -100,14 +120,18 @@ const FacultyTimetablePage = () => {
                                         <tr key={day} className="border-b hover:bg-muted/10">
                                             <td className="p-4 font-bold border-r bg-muted/20">{day}</td>
                                             {periods.map(period => {
-                                                const entry = getEntry(day, period);
+                                                const entries = getEntries(day, period);
                                                 return (
-                                                    <td key={period} className="p-2 border text-center min-w-[120px]">
-                                                        {entry ? (
-                                                            <div className="flex flex-col gap-1">
-                                                                <span className="font-semibold text-primary">{entry.subject}</span>
-                                                                <span className="text-xs text-muted-foreground">{entry.department} ({entry.batch})</span>
-                                                                {entry.time_slot && <span className="text-[10px] text-muted-foreground/50">{entry.time_slot}</span>}
+                                                    <td key={period} className="p-2 border text-center min-w-[180px] align-top">
+                                                        {entries.length > 0 ? (
+                                                            <div className="flex flex-col gap-2">
+                                                                {entries.map((entry, idx) => (
+                                                                    <div key={`${entry.subject}-${entry.batch}-${idx}`} className="rounded-lg bg-muted/30 p-2">
+                                                                        <span className="block font-semibold text-primary">{entry.subject}</span>
+                                                                        <span className="block text-xs text-muted-foreground">{entry.department} ({entry.batch})</span>
+                                                                        {entry.time_slot && <span className="block text-[10px] text-muted-foreground/70">{entry.time_slot}</span>}
+                                                                    </div>
+                                                                ))}
                                                             </div>
                                                         ) : (
                                                             <span className="text-muted-foreground/20">-</span>

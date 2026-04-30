@@ -1,7 +1,7 @@
 {
     "name": "mentorai-frontend",
     "version": "1.0.0",
-    "description": "Node.js Express frontend for MentorAI Student Module",
+    "description": "Node.js Express frontend for MentAi Student Module",
     "main": "server.js",
     "scripts": {
         "start": "node server.js",
@@ -12,7 +12,7 @@
         "student",
         "authentication"
     ],
-    "author": "MentorAI Team",
+    "author": "MentAi Team",
     "license": "MIT",
     "dependencies": {
         "express": "^4.18.2",

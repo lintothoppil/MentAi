@@ -33,6 +33,9 @@ interface Batch {
     end_year: number;
     status: string;
     is_completed: boolean;
+    status_tier?: "ongoing" | "final_year" | "alumni";
+    status_label?: string;
+    duplicate_count?: number;
 }
 
 const AdminBatchesPage = () => {
@@ -110,14 +113,11 @@ const AdminBatchesPage = () => {
             const data = await response.json();
             
             if (data.success) {
-                if (data.requires_confirmation) {
-                    // Show completion dialog
+                toast.success(data.message);
+                if (data.completed_batches?.length) {
                     setCompletedBatches(data.completed_batches);
-                    setShowCompletionDialog(true);
-                } else {
-                    toast.success(data.message);
-                    fetchBatches(); // Refresh the list
                 }
+                fetchBatches(); // Refresh the list
             } else {
                 toast.error(data.message);
             }
@@ -147,9 +147,14 @@ const AdminBatchesPage = () => {
         }
     };
 
-    const getStatusColor = (status: string, isCompleted: boolean) => {
-        if (isCompleted) return "bg-red-100 text-red-800 border-red-200";
-        return status === 'active' ? "bg-green-100 text-green-800 border-green-200" : "bg-gray-100 text-gray-800 border-gray-200";
+    const getStatusColor = (batch: Batch) => {
+        if (batch.status_tier === "alumni" || batch.is_completed) {
+            return "bg-red-100 text-red-800 border-red-200";
+        }
+        if (batch.status_tier === "final_year") {
+            return "bg-orange-100 text-orange-800 border-orange-200";
+        }
+        return "bg-green-100 text-green-800 border-green-200";
     };
 
     return (
@@ -230,8 +235,8 @@ const AdminBatchesPage = () => {
                                                         {batch.start_year} - {batch.end_year}
                                                     </p>
                                                 </div>
-                                                <Badge className={getStatusColor(batch.status, batch.is_completed)}>
-                                                    {batch.is_completed ? 'Completed' : batch.status}
+                                                <Badge className={getStatusColor(batch)}>
+                                                    {batch.status_label || (batch.is_completed ? "Alumni" : batch.status)}
                                                 </Badge>
                                             </div>
                                         </CardHeader>
@@ -240,7 +245,12 @@ const AdminBatchesPage = () => {
                                                 <span>Start: {batch.start_year}</span>
                                                 <span>End: {batch.end_year}</span>
                                             </div>
-                                            {batch.is_completed && (
+                                            {batch.duplicate_count && batch.duplicate_count > 1 && (
+                                                <div className="mt-2 text-xs text-muted-foreground">
+                                                    Merged from {batch.duplicate_count} duplicate batch records
+                                                </div>
+                                            )}
+                                            {(batch.status_tier === "alumni" || batch.is_completed) && (
                                                 <div className="mt-2 flex items-center text-red-600">
                                                     <AlertTriangle className="h-4 w-4 mr-1" />
                                                     <span>Ready for alumni transfer</span>

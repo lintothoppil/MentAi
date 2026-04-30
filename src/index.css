@@ -9,84 +9,84 @@
     --font-heading: 'Space Grotesk', system-ui, sans-serif;
     --font-body: 'Inter', system-ui, sans-serif;
 
-    --background: 222 47% 6%;
-    --foreground: 210 40% 96%;
+    --background: 0 0% 100%;
+    --foreground: 209 64% 16%;
 
-    --card: 222 40% 10%;
-    --card-foreground: 210 40% 96%;
+    --card: 0 0% 100%;
+    --card-foreground: 209 64% 16%;
 
-    --popover: 222 40% 10%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 209 64% 16%;
 
-    --primary: 175 80% 50%;
-    --primary-foreground: 222 47% 6%;
+    --primary: 209 64% 16%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 222 30% 16%;
-    --secondary-foreground: 210 40% 85%;
+    --secondary: 45 68% 47%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 222 30% 14%;
-    --muted-foreground: 215 20% 55%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 209 64% 30%;
 
-    --accent: 175 80% 50%;
-    --accent-foreground: 222 47% 6%;
+    --accent: 45 68% 47%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 55%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 222 20% 18%;
-    --input: 222 20% 18%;
-    --ring: 175 80% 50%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 45 68% 47%;
 
-    --radius: 0.875rem;
+    --radius: 1rem;
 
     /* Role-specific colors - neon variants */
-    --student: 210 90% 60%;
-    --student-light: 210 50% 15%;
+    --student: 45 68% 47%;
+    --student-light: 45 50% 15%;
     --student-foreground: 0 0% 100%;
 
-    --mentor: 175 80% 50%;
-    --mentor-light: 175 40% 14%;
+    --mentor: 209 64% 16%;
+    --mentor-light: 209 40% 14%;
     --mentor-foreground: 0 0% 100%;
 
-    --handler: 32 100% 58%;
-    --handler-light: 32 50% 14%;
+    --handler: 45 68% 47%;
+    --handler-light: 45 50% 14%;
     --handler-foreground: 0 0% 100%;
 
-    --hod: 275 70% 60%;
-    --hod-light: 275 40% 14%;
+    --hod: 209 64% 16%;
+    --hod-light: 209 40% 14%;
     --hod-foreground: 0 0% 100%;
 
-    --admin: 220 20% 50%;
-    --admin-light: 220 20% 14%;
+    --admin: 45 68% 47%;
+    --admin-light: 45 20% 14%;
     --admin-foreground: 0 0% 100%;
 
     /* Gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(222, 47%, 4%) 0%, hsl(230, 40%, 10%) 40%, hsl(200, 50%, 12%) 70%, hsl(175, 50%, 10%) 100%);
-    --gradient-student: linear-gradient(135deg, hsl(210, 90%, 55%) 0%, hsl(175, 80%, 45%) 100%);
-    --gradient-mentor: linear-gradient(135deg, hsl(175, 80%, 45%) 0%, hsl(200, 70%, 50%) 100%);
-    --gradient-handler: linear-gradient(135deg, hsl(32, 100%, 55%) 0%, hsl(45, 100%, 50%) 100%);
-    --gradient-hod: linear-gradient(135deg, hsl(275, 70%, 55%) 0%, hsl(300, 60%, 55%) 100%);
-    --gradient-admin: linear-gradient(135deg, hsl(222, 30%, 18%) 0%, hsl(250, 25%, 22%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(209, 64%, 16%) 0%, hsl(209, 64%, 8%) 100%);
+    --gradient-student: linear-gradient(135deg, hsl(45, 68%, 47%) 0%, hsl(45, 80%, 40%) 100%);
+    --gradient-mentor: linear-gradient(135deg, hsl(209, 64%, 16%) 0%, hsl(209, 80%, 25%) 100%);
+    --gradient-handler: linear-gradient(135deg, hsl(45, 68%, 47%) 0%, hsl(45, 100%, 40%) 100%);
+    --gradient-hod: linear-gradient(135deg, hsl(209, 64%, 16%) 0%, hsl(209, 80%, 25%) 100%);
+    --gradient-admin: linear-gradient(135deg, hsl(45, 68%, 47%) 0%, hsl(45, 80%, 40%) 100%);
 
-    --sidebar-background: 222 40% 8%;
-    --sidebar-foreground: 210 30% 80%;
-    --sidebar-primary: 175 80% 50%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 222 30% 14%;
-    --sidebar-accent-foreground: 210 30% 90%;
-    --sidebar-border: 222 20% 14%;
-    --sidebar-ring: 175 80% 50%;
+    --sidebar-background: 209 64% 16%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 45 68% 47%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 209 64% 20%;
+    --sidebar-accent-foreground: 45 68% 47%;
+    --sidebar-border: 209 64% 20%;
+    --sidebar-ring: 45 68% 47%;
 
     /* Glass effect tokens */
-    --glass-bg: hsla(222, 40%, 12%, 0.6);
-    --glass-border: hsla(210, 40%, 96%, 0.08);
-    --glass-highlight: hsla(175, 80%, 50%, 0.1);
-    --glow-primary: 0 0 40px hsla(175, 80%, 50%, 0.15);
-    --glow-student: 0 0 30px hsla(210, 90%, 60%, 0.2);
-    --glow-mentor: 0 0 30px hsla(175, 80%, 50%, 0.2);
-    --glow-handler: 0 0 30px hsla(32, 100%, 58%, 0.2);
-    --glow-hod: 0 0 30px hsla(275, 70%, 60%, 0.2);
-    --glow-admin: 0 0 30px hsla(220, 20%, 50%, 0.15);
+    --glass-bg: hsla(209, 64%, 16%, 0.8);
+    --glass-border: hsla(45, 68%, 47%, 0.2);
+    --glass-highlight: hsla(45, 68%, 47%, 0.1);
+    --glow-primary: 0 0 40px hsla(209, 64%, 16%, 0.15);
+    --glow-student: 0 0 30px hsla(45, 68%, 47%, 0.2);
+    --glow-mentor: 0 0 30px hsla(209, 64%, 16%, 0.2);
+    --glow-handler: 0 0 30px hsla(45, 68%, 47%, 0.2);
+    --glow-hod: 0 0 30px hsla(209, 64%, 16%, 0.2);
+    --glow-admin: 0 0 30px hsla(45, 68%, 47%, 0.15);
   }
 }
 
@@ -145,15 +145,15 @@
 
   .glass-card {
     backdrop-filter: blur(12px) saturate(150%);
-    background: hsla(222, 40%, 11%, 0.7);
-    border: 1px solid hsla(210, 40%, 96%, 0.06);
-    box-shadow: 0 8px 32px hsla(0, 0%, 0%, 0.3), inset 0 1px 0 hsla(210, 40%, 96%, 0.04);
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
   }
 
   .glass-subtle {
     backdrop-filter: blur(8px);
-    background: hsla(222, 40%, 10%, 0.4);
-    border: 1px solid hsla(210, 40%, 96%, 0.04);
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
   }
 
   .neon-glow {
@@ -172,8 +172,17 @@
   }
 
   .dot-pattern {
-    background-image: radial-gradient(hsla(210, 40%, 96%, 0.04) 1px, transparent 1px);
+    background-image: radial-gradient(rgba(0,0,0,0.05) 1px, transparent 1px);
     background-size: 24px 24px;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   /* Premium Notebook Loader */
@@ -297,4 +306,22 @@
       opacity: 0;
     }
   }
-}
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 10px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
+  }
+}

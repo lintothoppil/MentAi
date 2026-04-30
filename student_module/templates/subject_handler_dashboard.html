@@ -1,0 +1,43 @@
+{% extends "faculty_base.html" %}
+{% set title = "Subject Handler Dashboard" %}
+
+{% block content %}
+  <div class="flex items-start justify-between gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-display font-bold">Subject Handler Dashboard</h1>
+      <p class="text-slate-400 text-sm">Subject handling tools (notes, at-risk list, progress).</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="/mentor/dashboard" class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-semibold">
+        Mentor Dashboard
+      </a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="p-5 rounded-2xl bg-slate-900/40 border border-white/10">
+      <div class="flex items-center justify-between">
+        <div class="font-bold">At-risk Students</div>
+        <span class="material-symbols-outlined text-primary">warning</span>
+      </div>
+      <div class="text-xs text-slate-500 mt-2">API: <code>/subject-handler/at-risk-students</code></div>
+    </div>
+
+    <div class="p-5 rounded-2xl bg-slate-900/40 border border-white/10">
+      <div class="flex items-center justify-between">
+        <div class="font-bold">Notes</div>
+        <span class="material-symbols-outlined text-primary">menu_book</span>
+      </div>
+      <div class="text-xs text-slate-500 mt-2">API: <code>/subject-handler/notes</code>, <code>/subject-handler/notes/upload</code></div>
+    </div>
+
+    <div class="p-5 rounded-2xl bg-slate-900/40 border border-white/10">
+      <div class="flex items-center justify-between">
+        <div class="font-bold">Progress</div>
+        <span class="material-symbols-outlined text-primary">trending_up</span>
+      </div>
+      <div class="text-xs text-slate-500 mt-2">API: <code>/subject-handler/progress/&lt;adm&gt;/&lt;subject&gt;</code></div>
+    </div>
+  </div>
+{% endblock %}
+

@@ -41,24 +41,33 @@ def compute_student_analytics(student, attendance_records, internal_marks):
         sum_avg = 0
         sum_slope = 0
         for subj_id, exams in internal_marks.items():
-            if 'Internal1' in exams and 'Internal2' in exams:
-                val1, val2 = exams['Internal1'], exams['Internal2']
-                avg = (val1 + val2) / 2.0
-                sum_avg += avg
-                slope = val2 - val1 # Positive if improved
+            ordered_scores = []
+            for exam_name in sorted(exams.keys()):
+                value = exams.get(exam_name)
+                if value is None:
+                    continue
+                try:
+                    ordered_scores.append(float(value))
+                except (TypeError, ValueError):
+                    continue
+
+            if not ordered_scores:
+                continue
+
+            avg = sum(ordered_scores) / len(ordered_scores)
+            sum_avg += avg
+
+            for score in ordered_scores:
+                if score < 40:
+                    failure_count += 1
+
+            if len(ordered_scores) >= 2:
+                slope = ordered_scores[-1] - ordered_scores[0]
                 sum_slope += slope
-                
-                if val1 < 40: failure_count += 1
-                if val2 < 40: failure_count += 1
-                
-                # Drop detection
-                if (val2 - val1) < -15:
+                if slope < -15:
                     marks_drop_flag = 1
             else:
-                # Only 1 exam (or None)
-                val = list(exams.values())[0] if exams else 0
-                sum_avg += val
-                if val < 40: failure_count += 1
+                sum_slope += 0.0
                 
         total_avg_marks = sum_avg / subject_count
         marks_slope = sum_slope / subject_count  # Avg diff per subject
@@ -76,21 +85,32 @@ def compute_student_analytics(student, attendance_records, internal_marks):
         mean_mark = sum(all_marks) / len(all_marks)
         marks_variance = sum((x - mean_mark) ** 2 for x in all_marks) / len(all_marks)
 
-    # 4. Composite Risk Score
-    attendance_weight = 0.4
-    marks_weight = 0.4
-    failure_weight = 0.2
-    
-    # Normalize failure count slightly (say, max scale is 5 failures = 100% of failure weight)
-    failure_factor = min(failure_count, 5) / 5.0
-    
+    # 4. Composite Risk Score with severity instead of only binary flags.
+    attendance_risk = 0.0
+    if att_percent < 75:
+        attendance_risk = min(100.0, ((75.0 - att_percent) / 75.0) * 100.0)
+    if att_slope < -0.05:
+        attendance_risk = max(attendance_risk, min(100.0, attendance_risk + 15.0))
+    if att_drop_flag:
+        attendance_risk = max(attendance_risk, 25.0)
+
+    marks_risk = 0.0
+    if total_avg_marks > 0:
+        marks_risk = min(100.0, max(0.0, ((50.0 - total_avg_marks) / 50.0) * 100.0))
+    if marks_drop_flag:
+        marks_risk = max(marks_risk, min(100.0, marks_risk + 20.0))
+
+    failure_factor = min(failure_count, 6) / 6.0
+    failure_risk = failure_factor * 100.0
+
     risk_score = (
-        (attendance_weight * att_drop_flag * 100) +
-        (marks_weight * marks_drop_flag * 100) +
-        (failure_weight * failure_factor * 100)
+        (0.35 * attendance_risk) +
+        (0.40 * marks_risk) +
+        (0.25 * failure_risk)
     )
-    
-    # 4. Improvement Detection
+    risk_score = max(0.0, min(100.0, risk_score))
+
+    # 5. Improvement Detection
     status = "Stable"
     if risk_score >= 60:
         status = "Declining"

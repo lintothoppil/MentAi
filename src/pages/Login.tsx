@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { NotebookLoader } from "@/components/ui/NotebookLoader";
+import { clearStoredSession, normalizeRole, persistUserSession } from "@/lib/authSession";
 
 const Login = () => {
     const navigate = useNavigate();
@@ -36,19 +37,11 @@ const Login = () => {
             const data = await response.json();
 
             if (response.ok && data.success) {
-                // Determine role, normalize it, and map faculty to mentor dashboard
-                let rawRole = (data.data.role || 'student').toLowerCase().trim();
-
-                // Faculty designations default to mentor Dashboard
-                if (['assistant professor', 'associate professor', 'professor', 'faculty', 'teacher'].includes(rawRole)) {
-                    rawRole = 'mentor';
-                }
-
-                const role = rawRole.replace(/\s+/g, '-');
+                const role = normalizeRole(data.data.role);
                 data.data.role = role; // Save normalized role
 
-                // Store user data
-                localStorage.setItem('user', JSON.stringify(data.data));
+                clearStoredSession();
+                persistUserSession({ ...data.data, role });
 
                 toast({
                     title: "Login successful",
@@ -111,9 +104,9 @@ const Login = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
-                        className="text-2xl font-heading font-medium text-foreground tracking-tight"
+                        className="text-2xl font-black text-slate-800 tracking-tight"
                     >
-                        {isNavigating ? "Preparing your dashboard..." : "Processing sign in..."}
+                        {isNavigating ? "Entering Dashboard..." : "Securely Signing in..."}
                     </motion.h2>
                 </motion.div>
             )}
@@ -127,13 +120,13 @@ const Login = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6 }}
                 >
-                    <div className="h-20 w-20 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto mb-8 neon-glow">
-                        <Brain className="h-10 w-10 text-primary" />
+                    <div className="h-24 w-24 rounded-3xl bg-white/10 backdrop-blur-xl flex items-center justify-center mx-auto mb-10 border border-white/20 shadow-2xl">
+                        <Brain className="h-12 w-12 text-white" />
                     </div>
-                    <h2 className="text-4xl font-bold text-foreground mb-3 font-heading">
-                        MENTOR<span className="gradient-text">-AI</span>
+                    <h2 className="text-5xl font-black text-white mb-4 font-heading tracking-tighter">
+                        Ment<span className="text-indigo-400">Ai</span>
                     </h2>
-                    <p className="text-foreground/50 max-w-sm mx-auto leading-relaxed">
+                    <p className="text-white/70 text-lg font-medium max-w-sm mx-auto leading-relaxed">
                         AI-powered academic mentoring platform. Smart analytics, personalized insights, seamless scheduling.
                     </p>
                 </motion.div>
@@ -156,26 +149,26 @@ const Login = () => {
                         <ArrowLeft className="mr-2 h-4 w-4" /> Back
                     </Button>
 
-                    <div className="mb-8">
-                        <h1 className="text-3xl font-bold text-foreground font-heading">Sign In</h1>
-                        <p className="mt-2 text-sm text-muted-foreground">Enter your credentials to access your dashboard</p>
+                    <div className="mb-10">
+                        <h1 className="text-4xl font-black text-slate-800 font-heading tracking-tight">Sign In</h1>
+                        <p className="mt-2 text-slate-500 font-semibold italic">Welcome to the future of academic mentoring.</p>
                     </div>
 
                     <form onSubmit={handleLogin} className="space-y-5">
                         <div>
-                            <Label htmlFor="username" className="text-foreground/70 text-xs uppercase tracking-wider">Admission Number / Username</Label>
+                            <Label htmlFor="username" className="text-slate-500 font-black text-[10px] uppercase tracking-[0.2em] mb-2 block">Admission Number / Username</Label>
                             <Input
                                 id="username"
                                 placeholder="Admission No. or Staff ID"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                className="mt-2 bg-secondary/50 border-border focus:border-primary/50 h-11"
+                                className="mt-2 bg-slate-50 border-slate-200 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 h-12 rounded-xl font-bold transition-all"
                                 required
                             />
                         </div>
 
                         <div>
-                            <Label htmlFor="password" className="text-foreground/70 text-xs uppercase tracking-wider">Password</Label>
+                            <Label htmlFor="password" className="text-slate-500 font-black text-[10px] uppercase tracking-[0.2em] mb-2 block">Password</Label>
                             <div className="relative mt-2">
                                 <Input
                                     id="password"
@@ -183,7 +176,7 @@ const Login = () => {
                                     placeholder="Enter your password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="bg-secondary/50 border-border focus:border-primary/50 h-11 pr-10"
+                                    className="bg-slate-50 border-slate-200 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 h-12 pr-12 rounded-xl font-bold transition-all"
                                     required
                                 />
                                 <button
@@ -208,10 +201,10 @@ const Login = () => {
 
                         <Button
                             type="submit"
-                            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-11 font-heading font-semibold neon-glow"
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-12 rounded-xl font-black text-base shadow-xl shadow-indigo-100 transition-all active:scale-[0.98]"
                             disabled={loading}
                         >
-                            {loading ? "Signing in..." : "Sign In"}
+                            {loading ? "Signing in..." : "Access Dashboard"}
                         </Button>
                     </form>
 

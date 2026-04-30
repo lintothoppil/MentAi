@@ -2,6 +2,10 @@ from functools import wraps
 from flask import session, jsonify
 
 
+def _normalize_role(role: str) -> str:
+    return str(role or "").strip().lower().replace(" ", "-").replace("_", "-")
+
+
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -13,11 +17,13 @@ def login_required(f):
 
 def role_required(*roles):
     """Accept one or more roles, e.g. @role_required('admin') or @role_required('mentor','hod')"""
+    normalized = {_normalize_role(r) for r in roles}
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
-            user_role = session.get('role', '')
-            if user_role not in roles:
+            # Support both session keys used across the codebase.
+            user_role = session.get('role') or session.get('user_role') or ''
+            if _normalize_role(user_role) not in normalized:
                 return jsonify({'status': 'error', 'message': f'Forbidden. Required role: {" or ".join(roles)}.'}), 403
             return f(*args, **kwargs)
         return decorated

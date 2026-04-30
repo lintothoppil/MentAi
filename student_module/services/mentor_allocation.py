@@ -6,7 +6,7 @@ def get_courses_by_department(department: str):
     # If no strict department matches exist, return courses dynamically assigned to this dept (needs logic based on existing data)
     # The prompt: /api/admin/courses?department=X
     # Course code or name usually relates. Just return all for now or exact match if your model binds them.
-    # MentorAI Course table doesn't have a direct 'department' column, just 'name' and 'code'.
+    # MentyiA Course table doesn't have a direct 'department' column, just 'name' and 'code'.
     # We will derive from courses that have been used by students in that department or just use the branch.
     # For now:
     return [{"id": c.id, "name": c.name} for c in courses]
