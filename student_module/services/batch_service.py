@@ -142,6 +142,45 @@ def _student_sort_key(student: Student):
     return ((student.admission_number or "").strip().upper(), (student.full_name or "").strip().lower())
 
 
+def _course_family_from_text(value: str | None) -> str:
+    text = (value or "").strip().upper()
+    if "IMCA" in text or "INTEGRATED MCA" in text:
+        return "IMCA"
+    if "MCA" in text or "COMPUTER APPLICATIONS" in text:
+        return "MCA"
+    if "MBA" in text or "BUSINESS ADMINISTRATION" in text or "MANAGEMENT" in text:
+        return "MBA"
+    return text
+
+
+def _course_family_for_student(student: Student) -> str:
+    for value in (student.batch, student.admission_number, student.branch):
+        family = _course_family_from_text(value)
+        if family in {"MCA", "IMCA", "MBA"}:
+            return family
+    return _course_family_from_text(student.branch)
+
+
+def _course_family_for_batch(batch: Batch, batch_label: str | None = None) -> str:
+    label_family = _course_family_from_text(batch_label)
+    if label_family in {"MCA", "IMCA", "MBA"}:
+        return label_family
+
+    course = Course.query.get(batch.course_id) if batch and batch.course_id else None
+    course_family = _course_family_from_text(course.name if course else None)
+    if course_family == "MCA" and batch_label and "IMCA" in batch_label.upper():
+        return "IMCA"
+    return course_family
+
+
+def _student_matches_batch_course(student: Student, batch: Batch, batch_label: str | None = None) -> bool:
+    target_family = _course_family_for_batch(batch, batch_label)
+    student_family = _course_family_for_student(student)
+    if target_family in {"MCA", "IMCA", "MBA"}:
+        return student_family == target_family
+    return True
+
+
 def get_department_student_filter(department: str):
     """Build a student filter that supports department aliases like MCA/IMCA."""
     norm_target = normalize_dept(department)
@@ -248,8 +287,9 @@ def redistribute_mentors_full(department: str, batch_id: int,
         if not target_years:
             return {"error": f"Cannot parse years from: {batch_label}"}
         
-        # Get students filtered by batch_id OR year range match
-        # AND course match via batch relationship
+        # Get students filtered by batch_id OR year range match, always keeping
+        # course family separate (MCA and IMCA can share a department, but not
+        # an allocation bucket).
         all_dept = Student.query.filter(
             Student.status.ilike('live'),
             get_department_student_filter(department)
@@ -258,16 +298,14 @@ def redistribute_mentors_full(department: str, batch_id: int,
         matched = {}
         for s in all_dept:
             # Primary: match by batch_id
-            if s.batch_id == batch_id:
+            if s.batch_id == batch_id and _student_matches_batch_course(s, batch, batch_label):
                 matched[s.admission_number] = s
                 continue
             # Fallback: match by year range
             if s.batch:
                 years = extract_year_range(s.batch)
                 if years and years == target_years:
-                    # Verify course matches via batch string prefix
-                    course_prefix = course.name.upper()
-                    if course_prefix in (s.batch or '').upper():
+                    if _student_matches_batch_course(s, batch, batch_label):
                         matched[s.admission_number] = s
         
         students = sorted(matched.values(), key=_student_sort_key)
@@ -354,6 +392,9 @@ def redistribute_mentors_incremental(department: str, batch_id: int,
         if not target_years:
             return {"error": f"Cannot parse year range from: {batch_label}"}
         target_start, target_end = target_years
+        batch = Batch.query.get(batch_id)
+        if not batch:
+            return {"error": f"Batch id={batch_id} not found"}
 
         # Get all students in this department (exact case-insensitive match)
         all_dept_students = Student.query.filter(
@@ -364,12 +405,12 @@ def redistribute_mentors_incremental(department: str, batch_id: int,
         # Match students by batch_id OR by year range
         all_batch_students_dict = {}
         for s in all_dept_students:
-            if s.batch_id == batch_id:
+            if s.batch_id == batch_id and _student_matches_batch_course(s, batch, batch_label):
                 all_batch_students_dict[s.admission_number] = s
                 continue
             if s.batch:
                 years = extract_year_range(s.batch)
-                if years and years == target_years:
+                if years and years == target_years and _student_matches_batch_course(s, batch, batch_label):
                     all_batch_students_dict[s.admission_number] = s
         
         # Convert to list and sort

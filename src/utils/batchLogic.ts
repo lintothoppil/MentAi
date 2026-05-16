@@ -20,6 +20,23 @@ export const getCourseDuration = (dept: string | null, admNo: string = ''): numb
     return 4; // Default to 4 (B.Tech etc)
 };
 
+export const getCourseCode = (dept: string | null): string => {
+    const raw = (dept || '').trim();
+    const d = raw.toUpperCase();
+    const parenCode = raw.match(/\(([A-Za-z0-9]+)\)\s*$/);
+    if (parenCode) return parenCode[1].toUpperCase();
+    if (d.includes('IMCA')) return 'IMCA';
+    if (d.includes('MCA') || d.includes('COMPUTER APPLICATIONS')) return 'MCA';
+    if (d.includes('MBA') || d.includes('BUSINESS')) return 'MBA';
+    if (d.includes('COMPUTER SCIENCE') || d === 'CS') return 'CSE';
+    if (d.includes('MECHANICAL')) return 'ME';
+    if (d.includes('CIVIL')) return 'CE';
+    if (d.includes('ELECTRICAL')) return 'EEE';
+    if (d.includes('ELECTRONICS AND COMPUTER')) return 'ECM';
+    if (d.includes('ELECTRONICS')) return 'ECE';
+    return raw || 'Course';
+};
+
 const getBatchEndYear = (startYear: number, duration: number, prefix: string = ''): number => {
     return startYear + duration;
 };
@@ -73,7 +90,7 @@ export const generateBatchOptions = (dept: string | null, extraYears: number = 0
         const duration = 2;
         const maxYear = currentYear + extraYears;
         for (let y = 2024 + shiftStart; y <= maxYear; y++) {
-            batches.push(`${y}-${y + duration}`);
+            batches.push(`MBA ${y}-${y + duration}`);
         }
         return batches.sort();
     }
@@ -83,12 +100,13 @@ export const generateBatchOptions = (dept: string | null, extraYears: number = 0
     if (d.includes('M.TECH') || d.includes('MSC')) duration = 2;
 
     const maxYear = currentYear + extraYears;
+    const courseCode = getCourseCode(dept);
 
     // B.Tech starts 2022 normally. 
     // If shiftStart > 0 (Add Next Batch pressed), we shift window forward:
     // e.g. shift=1 -> Starts 2023. Old 2022 is removed (goes to alumni).
     for (let y = 2022 + shiftStart; y <= maxYear; y++) {
-        batches.push(`${y}-${y + duration}`);
+        batches.push(`${courseCode} ${y}-${y + duration}`);
     }
 
     return batches.sort();

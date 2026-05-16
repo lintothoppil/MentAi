@@ -52,6 +52,7 @@ type StudentRow = {
   risk_score: number;
   risk_level: "High" | "Medium" | "Low";
   pending_interventions: number;
+  private_note_count?: number;
 };
 
 type AlertRow = {
@@ -205,7 +206,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 export default function MentorDashboard() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const mentorId = Number(user?.id || 0);
+  const mentorId = Number(user?.faculty_id || user?.id || 0);
   const isSubjectHandler = hasRole(user, "subject-handler");
   const navItems = [
     ...mentorNavItems,
@@ -526,6 +527,7 @@ export default function MentorDashboard() {
                         <th className="p-2 text-left">Risk</th>
                         <th className="p-2 text-left">Attendance</th>
                         <th className="p-2 text-left">Pending</th>
+                        <th className="p-2 text-left">Notes</th>
                         <th className="p-2 text-left">Action</th>
                       </tr>
                     </thead>
@@ -536,6 +538,7 @@ export default function MentorDashboard() {
                           <td className="p-2"><Badge className={riskBadgeClass(s.risk_level)}>{s.risk_level} ({s.risk_score})</Badge></td>
                           <td className="p-2">{s.attendance_percent}%</td>
                           <td className="p-2">{s.pending_interventions}</td>
+                          <td className="p-2">{s.private_note_count || 0}</td>
                           <td className="p-2"><Button size="sm" variant="outline" onClick={() => openStudentProfile(s)}>View Profile</Button></td>
                         </tr>
                       ))}

@@ -67,6 +67,15 @@ const averageNonNull = (values: any[]): number | null => {
   return nums.length ? nums.reduce((sum, value) => sum + value, 0) / nums.length : null;
 };
 
+const firstNumber = (...values: any[]): number | null => {
+  for (const value of values) {
+    if (value == null || value === "") continue;
+    const numeric = Number(value);
+    if (!Number.isNaN(numeric)) return numeric;
+  }
+  return null;
+};
+
 const normalizeScore = (value: any): number | null => {
   if (value == null || value === "") return null;
   const numeric = Number(value);
@@ -453,15 +462,21 @@ export default function StudentAcademicsPage() {
     };
   });
 
+  const activeMarksInternalAvg = averageNonNull(activeMarks.map((mark) => normalizeInternalScore(mark)));
+  const activeMarksUniversityAvg = averageNonNull(activeMarks.map((mark) => mark.university_mark));
+  const activeMarksCombinedAvg = averageNonNull(activeMarks.map((mark) => getCombinedScore(mark)));
+  const progressionSubjects = selectedSemesterProgression?.subjects || [];
+  const progressionSubjectsUniversityAvg = averageNonNull(progressionSubjects.map((subject: any) => subject.university_mark));
+
   const internalAvg = selectedSemesterProgression
-    ? selectedSemesterProgression.internal3 ?? selectedSemesterProgression.internal2 ?? selectedSemesterProgression.internal1 ?? null
-    : averageNonNull(activeMarks.map((mark) => normalizeInternalScore(mark)));
+    ? firstNumber(selectedSemesterProgression.internal3, selectedSemesterProgression.internal2, selectedSemesterProgression.internal1, activeMarksInternalAvg)
+    : activeMarksInternalAvg;
   const universityAvg = selectedSemesterProgression
-    ? selectedSemesterProgression.university
-    : averageNonNull(activeMarks.map((mark) => mark.university_mark));
+    ? firstNumber(selectedSemesterProgression.university, activeMarksUniversityAvg, progressionSubjectsUniversityAvg)
+    : activeMarksUniversityAvg;
   const combinedAvg = selectedSemesterProgression
-    ? selectedSemesterProgression.combined ?? selectedSemesterProgression.progressionScore
-    : averageNonNull(activeMarks.map((mark) => getCombinedScore(mark)));
+    ? firstNumber(selectedSemesterProgression.combined, selectedSemesterProgression.progressionScore, activeMarksCombinedAvg)
+    : activeMarksCombinedAvg;
   const verifiedCount = activeMarks.filter((mark) => mark.is_verified).length;
   const visibleSemesterSgpa = selectedSemester !== "All" ? academics?.semester_sgpa?.[selectedSemester] : null;
   const fallbackCgpa = academics?.cgpa != null && Number(academics.cgpa) > 0 ? Number(academics.cgpa).toFixed(2) : "—";

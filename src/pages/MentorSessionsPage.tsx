@@ -33,6 +33,7 @@ const navItems = [
 
 interface Session {
     id: number;
+    mentor_id?: number;
     date: string;
     time_slot: string;
     slot_type: string;
@@ -354,7 +355,8 @@ export default function MentorSessionsPage() {
         if (!respondTarget) return;
         setResponding(true);
         try {
-            const body: any = { action, mentor_id: mentorId };
+            const effectiveMentorId = respondTarget.mentor_id || mentorId;
+            const body: any = { action, mentor_id: effectiveMentorId };
             if (meetingLink) body.meeting_link = meetingLink;
             if (action === "reschedule") {
                 if (rescheduleDate) body.date = rescheduleDate;
@@ -370,7 +372,7 @@ export default function MentorSessionsPage() {
             const res = await fetch(endpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(action === "Attended" || action === "Absent" ? { status: action } : body),
+                body: JSON.stringify(action === "Attended" || action === "Absent" ? { status: action, mentor_id: effectiveMentorId } : body),
             });
             const d = await res.json();
             if (d.success) {
@@ -651,6 +653,13 @@ export default function MentorSessionsPage() {
                         )}
                         {s.status === "Approved" && (
                             <>
+                                {s.session_type === "Online" && s.meeting_link && (
+                                    <a href={s.meeting_link} target="_blank" rel="noopener noreferrer">
+                                        <Button size="sm" className="text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white">
+                                            <Video className="h-3 w-3 mr-1" /> Join Meet
+                                        </Button>
+                                    </a>
+                                )}
                                 <Button size="sm" variant="outline" className="text-xs font-black" onClick={() => setNoteTarget(s)}>
                                     Private Note
                                 </Button>
@@ -945,13 +954,16 @@ export default function MentorSessionsPage() {
 
                         {respondTarget?.session_type === "Online" && respondTarget.status === "Pending" && (
                             <div>
-                                <Label className="text-xs">Meeting Link (optional for online sessions)</Label>
+                                <Label className="text-xs">Google Meet Link</Label>
                                 <Input
-                                    placeholder="https://meet.google.com/..."
+                                    placeholder="Auto-generated if left blank"
                                     value={meetingLink}
                                     onChange={e => setMeetingLink(e.target.value)}
                                     className="h-9 text-sm"
                                 />
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Leave this blank to create a Google Meet join link for both mentor and student.
+                                </p>
                             </div>
                         )}
                     </div>

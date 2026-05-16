@@ -95,6 +95,33 @@ def get_batch_end_year(start_year, duration_years, course_name=None):
     return start_year + duration_years
 
 
+def get_short_course_name(course_name):
+    name = (course_name or '').strip()
+    upper = name.upper()
+    paren_match = re.search(r'\(([A-Z0-9]+)\)\s*$', name, re.IGNORECASE)
+    if paren_match:
+        return paren_match.group(1).upper()
+    if is_mba_course_name(name):
+        return 'MBA'
+    if 'IMCA' in upper or 'INTEGRATED MCA' in upper:
+        return 'IMCA'
+    if is_computer_applications_course_name(name):
+        return 'MCA'
+    if 'COMPUTER SCIENCE' in upper or upper == 'CS':
+        return 'CSE'
+    if 'MECHANICAL' in upper:
+        return 'ME'
+    if 'CIVIL' in upper:
+        return 'CE'
+    if 'ELECTRICAL' in upper:
+        return 'EEE'
+    if 'ELECTRONICS AND COMPUTER' in upper:
+        return 'ECM'
+    if 'ELECTRONICS' in upper:
+        return 'ECE'
+    return name
+
+
 def get_display_course_name(batch, course_name):
     if is_mba_course_name(course_name):
         return 'MBA'
@@ -106,7 +133,7 @@ def get_display_course_name(batch, course_name):
         if has_imca_student or (int(batch.end_year) - int(batch.start_year) >= 5):
             return 'IMCA'
         return 'MCA'
-    return course_name
+    return get_short_course_name(course_name)
 
 
 def _grade_point_from_value(mark_or_grade):
@@ -309,13 +336,14 @@ def sync_passed_out_students_to_alumni():
         existing = AlumniStudent.query.filter_by(admission_number=student.admission_number).first()
         batch = Batch.query.get(student.batch_id) if student.batch_id else None
         passout_year = student.passout_year or (batch.end_year if batch else None)
+        current_or_existing_mentor_id = student.mentor_id or (existing.mentor_id if existing else None)
         if existing:
             existing.name = student.full_name
             existing.email = student.email
             existing.department = student.branch
             existing.course_id = batch.course_id if batch else existing.course_id
             existing.batch_id = batch.id if batch else existing.batch_id
-            existing.mentor_id = student.mentor_id
+            existing.mentor_id = current_or_existing_mentor_id
             existing.passout_year = passout_year
             touched += 1
         else:
@@ -326,11 +354,25 @@ def sync_passed_out_students_to_alumni():
                 department=student.branch,
                 course_id=batch.course_id if batch else None,
                 batch_id=batch.id if batch else None,
-                mentor_id=student.mentor_id,
+                mentor_id=current_or_existing_mentor_id,
                 passout_year=passout_year
             )
             db.session.add(alumni)
             synced += 1
+        if current_or_existing_mentor_id:
+            existing_history = AlumniMentorHistory.query.filter_by(
+                admission_number=student.admission_number,
+                mentor_id=current_or_existing_mentor_id
+            ).first()
+            if not existing_history:
+                db.session.add(AlumniMentorHistory(
+                    admission_number=student.admission_number,
+                    mentor_id=current_or_existing_mentor_id,
+                    start_date=student.created_at or datetime.utcnow(),
+                    end_date=datetime.utcnow()
+                ))
+                touched += 1
+        _transfer_mentor_notes_to_admin(student.admission_number)
         if passout_year and not student.passout_year:
             student.passout_year = passout_year
 
@@ -411,11 +453,24 @@ with app.app_context():
                         conn.execute(text("ALTER TABLE students ADD CONSTRAINT fk_student_mentor FOREIGN KEY (mentor_id) REFERENCES faculty(id)"))
                     conn.commit()
             
+            if 'batch_id' not in columns:
+                print("Migrating: Adding batch_id to students table...")
+                with db.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE students ADD COLUMN batch_id INTEGER REFERENCES batches(id)"))
+                    conn.commit()
+
+            if 'passout_year' not in columns:
+                print("Migrating: Adding passout_year to students table...")
+                with db.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE students ADD COLUMN passout_year INTEGER"))
+                    conn.commit()
+
             if 'status' not in columns:
                 print("Migrating: Adding status to students table...")
                 with db.engine.connect() as conn:
                     conn.execute(text("ALTER TABLE students ADD COLUMN status VARCHAR(20) DEFAULT 'Live'"))
                     conn.commit()
+
                     
         # Faculty table migration
         if 'faculty' in inspector.get_table_names():
@@ -1587,8 +1642,6 @@ def api_get_students_list():
         return jsonify({'success': True, 'data': data}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': True, 'data': data}), 200
-    except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/admin/student/<string:admission_number>/status', methods=['PUT'])
@@ -2229,6 +2282,8 @@ def api_archive_batch():
                     )
                     db.session.add(history)
 
+                _transfer_mentor_notes_to_admin(s.admission_number)
+
                 s.status = 'Passed Out'
                 s.mentor_id = None
                 s.passout_year = batch.end_year
@@ -2306,6 +2361,170 @@ def _transfer_mentor_notes_to_admin(student_admission_number: str):
         note.transferred_to_admin = True
         note.transferred_at = datetime.utcnow()
         note.visibility = 'alumni_admin'
+
+
+def _serialize_alumni_detail(admission_number: str):
+    admission_number = admission_number.upper()
+    alumni = AlumniStudent.query.filter_by(admission_number=admission_number).first()
+    if not alumni:
+        return None
+
+    student = Student.query.get(admission_number)
+    batch = Batch.query.get(alumni.batch_id) if alumni.batch_id else None
+    course = Course.query.get(alumni.course_id) if alumni.course_id else (Course.query.get(batch.course_id) if batch else None)
+    academic = Academic.query.filter_by(student_admission_number=admission_number).first()
+    parent = Parent.query.filter_by(student_admission_number=admission_number).first()
+    guardian = Guardian.query.filter_by(student_admission_number=admission_number).first()
+    other_info = OtherInfo.query.filter_by(student_admission_number=admission_number).first()
+    work_experiences = WorkExperience.query.filter_by(student_admission_number=admission_number).all()
+    accommodation_type = other_info.accommodation_type if other_info else None
+    is_hosteler = str(accommodation_type or "").strip().lower() == "hosteler"
+    is_day_scholar = str(accommodation_type or "").strip().lower() == "day scholar"
+
+    mentor_history_rows = db.session.query(AlumniMentorHistory, Faculty).outerjoin(
+        Faculty, Faculty.id == AlumniMentorHistory.mentor_id
+    ).filter(
+        AlumniMentorHistory.admission_number == admission_number
+    ).order_by(
+        AlumniMentorHistory.created_at.asc()
+    ).all()
+
+    mentoring_session_rows = db.session.query(MentoringSession, Faculty).outerjoin(
+        Faculty, Faculty.id == MentoringSession.mentor_id
+    ).filter(
+        MentoringSession.student_admission_number == admission_number
+    ).order_by(
+        MentoringSession.date.desc(),
+        MentoringSession.created_at.desc()
+    ).all()
+
+    attendance_rows = Attendance.query.filter_by(student_admission_number=admission_number).all()
+    total_classes = sum((row.total_classes or 0) for row in attendance_rows)
+    attended_classes = sum((row.attended_classes or 0) for row in attendance_rows)
+    attendance_percentage = round((attended_classes / total_classes) * 100, 2) if total_classes else None
+
+    university_results = UniversityResult.query.filter_by(student_id=admission_number).all()
+    verified_results = [row for row in university_results if (row.status or '').lower() == 'verified']
+    student_marks = StudentMark.query.filter_by(student_id=admission_number).all()
+
+    latest_mentor_name = None
+    if alumni.mentor_id:
+        mentor = Faculty.query.get(alumni.mentor_id)
+        latest_mentor_name = mentor.name if mentor else None
+    if not latest_mentor_name and mentor_history_rows:
+        latest_mentor_name = mentor_history_rows[-1][1].name if mentor_history_rows[-1][1] else None
+
+    return {
+        'summary': {
+            'admission_number': alumni.admission_number,
+            'name': alumni.name,
+            'email': alumni.email,
+            'department': alumni.department,
+            'course_name': get_display_course_name(batch, course.name) if batch and course else (course.name if course else 'N/A'),
+            'batch_start_year': batch.start_year if batch else None,
+            'batch_end_year': batch.end_year if batch else None,
+            'passout_year': alumni.passout_year,
+            'alumni_since': alumni.created_at.strftime('%Y-%m-%d') if alumni.created_at else None,
+            'student_status': student.status if student else 'Passed Out',
+            'mentor_name': latest_mentor_name,
+        },
+        'profile': {
+            'roll_number': student.roll_number if student else None,
+            'date_of_birth': student.dob.isoformat() if student and student.dob else None,
+            'age': student.age if student else None,
+            'blood_group': student.blood_group if student else None,
+            'mobile_number': student.mobile_number if student else None,
+            'religion': student.religion if student else None,
+            'diocese': student.diocese if student else None,
+            'parish': student.parish if student else None,
+            'caste_category': student.caste_category if student else None,
+            'permanent_address': student.permanent_address if student else None,
+            'contact_address': student.contact_address if student else None,
+            'photo_path': student.photo_path if student else None,
+            'mentor_remarks': student.mentor_remarks if student else None,
+            'profile_completed': bool(student.profile_completed) if student else False,
+        },
+        'academics': {
+            'cgpa': academic.cgpa if academic else None,
+            'sgpa': academic.sgpa if academic else None,
+            'tenth_school': academic.school_10th if academic else None,
+            'tenth_board': academic.board_10th if academic else None,
+            'tenth_percentage': academic.percentage_10th if academic else None,
+            'twelfth_school': academic.school_12th if academic else None,
+            'twelfth_board': academic.board_12th if academic else None,
+            'twelfth_percentage': academic.percentage_12th if academic else None,
+            'ug_college': academic.college_ug if academic else None,
+            'ug_university': academic.university_ug if academic else None,
+            'ug_percentage': academic.percentage_ug if academic else None,
+            'medium_of_instruction': academic.medium_of_instruction if academic else None,
+            'entrance_rank': academic.entrance_rank if academic else None,
+            'nature_of_admission': academic.nature_of_admission if academic else None,
+            'verified_university_results': len(verified_results),
+            'total_university_results': len(university_results),
+            'internal_mark_records': len(student_marks),
+        },
+        'mentoring': {
+            'mentor_history': [
+                {
+                    'mentor_id': history.mentor_id,
+                    'mentor_name': mentor.name if mentor else 'Unknown mentor',
+                    'start_date': history.start_date.isoformat() if history.start_date else None,
+                    'end_date': history.end_date.isoformat() if history.end_date else None,
+                    'created_at': history.created_at.isoformat() if history.created_at else None,
+                }
+                for history, mentor in mentor_history_rows
+            ],
+            'sessions': [
+                {
+                    'id': session.id,
+                    'mentor_name': mentor.name if mentor else 'Unknown mentor',
+                    'date': session.date.isoformat() if session.date else None,
+                    'time_slot': session.time_slot,
+                    'slot_type': session.slot_type,
+                    'session_type': session.session_type,
+                    'status': session.status,
+                    'meeting_link': session.meeting_link,
+                    'notes': session.notes,
+                    'absence_reason': session.absence_reason,
+                    'created_at': session.created_at.isoformat() if session.created_at else None,
+                }
+                for session, mentor in mentoring_session_rows
+            ],
+        },
+        'family': {
+            'father_name': parent.father_name if parent else None,
+            'father_profession': parent.father_profession if parent else None,
+            'father_mobile': parent.father_mobile if parent else None,
+            'mother_name': parent.mother_name if parent else None,
+            'mother_profession': parent.mother_profession if parent else None,
+            'mother_mobile': parent.mother_mobile if parent else None,
+            'guardian_name': guardian.name if guardian else None,
+            'guardian_mobile': guardian.mobile_number if guardian else None,
+            'guardian_address': guardian.address if guardian else None,
+        },
+        'campus_life': {
+            'accommodation_type': accommodation_type,
+            'staying_with': other_info.staying_with if (other_info and is_day_scholar) else None,
+            'hostel_name': other_info.hostel_name if (other_info and is_hosteler) else None,
+            'stay_from': other_info.stay_from.isoformat() if other_info and other_info.stay_from else None,
+            'stay_to': other_info.stay_to.isoformat() if other_info and other_info.stay_to else None,
+            'transport_mode': other_info.transport_mode if (other_info and is_day_scholar) else None,
+            'vehicle_number': other_info.vehicle_number if (other_info and is_day_scholar) else None,
+        },
+        'performance': {
+            'attendance_percentage': attendance_percentage,
+            'attended_classes': attended_classes,
+            'total_classes': total_classes,
+        },
+        'experience': [
+            {
+                'organization': item.organization,
+                'job_title': item.job_title,
+                'duration': item.duration,
+            }
+            for item in work_experiences
+        ],
+    }
 
 
 def _promote_batch_students_to_alumni(batch, students):
@@ -2682,6 +2901,24 @@ def api_get_alerts(role, id):
             alerts = Alert.query.filter_by(mentor_id=id).order_by(desc(Alert.created_at)).limit(20).all()
         else:
             return jsonify({'success': False, 'message': 'Invalid role'}), 400
+
+        def alert_is_current(alert):
+            alert_type = str(alert.type or '').upper()
+            message = str(alert.message or '').lower()
+            is_low_attendance_alert = alert_type == 'LOW_ATTENDANCE' or 'below 75' in message
+            if not is_low_attendance_alert:
+                return True
+
+            analytics = StudentAnalytics.query.filter_by(student_id=alert.student_admission_number).first()
+            attendance_pct = float(getattr(analytics, 'attendance_percentage', 0) or 0) if analytics else None
+            if attendance_pct is None or attendance_pct <= 0:
+                try:
+                    attendance_pct = float(calculate_analytics(alert.student_admission_number).get('attendance_percentage') or 0)
+                except Exception:
+                    attendance_pct = None
+            return attendance_pct is None or attendance_pct < 75
+
+        alerts = [alert for alert in alerts if alert_is_current(alert)]
             
         return jsonify({
             'success': True,
@@ -2805,7 +3042,12 @@ def calculate_analytics(student_id):
             adjusted_risk = r_det_adj * 100.0
 
         sa.adjusted_risk = round(max(0.0, min(100.0, adjusted_risk)), 2)
-        if sa.adjusted_risk >= 60:
+        if (
+            sa.adjusted_risk >= 60
+            or (sa.attendance_percentage is not None and sa.attendance_percentage < 75)
+            or (sa.attendance_slope is not None and sa.attendance_slope < -0.05)
+            or (sa.marks_slope is not None and sa.marks_slope < 0)
+        ):
             sa.status = "Declining"
         elif sa.adjusted_risk <= 30 and sa.attendance_slope and sa.attendance_slope > 0 and sa.marks_slope and sa.marks_slope > 0:
             sa.status = "Improving"
@@ -2871,6 +3113,7 @@ def calculate_analytics(student_id):
     metrics['ml_risk_probability'] = sa.ml_risk_probability
     metrics['compliance_modifier'] = sa.compliance_modifier
     metrics['adjusted_risk'] = sa.adjusted_risk
+    metrics['status'] = sa.status
     return metrics
 
 @app.route('/api/analytics/student/<string:student_id>', methods=['GET'])
@@ -2886,6 +3129,44 @@ def api_get_student_analytics(student_id):
         
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+def _course_label_from_student(student):
+    text = " ".join([
+        str(student.batch or ''),
+        str(student.admission_number or ''),
+        str(student.branch or ''),
+    ]).upper()
+    if 'IMCA' in text or 'INTEGRATED MCA' in text:
+        return 'IMCA'
+    if 'MCA' in text or 'COMPUTER APPLICATIONS' in text:
+        return 'MCA'
+    if 'MBA' in text or 'BUSINESS ADMINISTRATION' in text or 'MANAGEMENT' in text:
+        return 'MBA'
+    return get_short_course_name(student.branch) or 'Course'
+
+
+def _display_batch_label_from_student(student, course_label=None):
+    from services.batch_service import extract_year_range
+    years = extract_year_range(student.batch or '')
+    if years:
+        return f"{course_label or _course_label_from_student(student)} {years[0]}-{years[1]}"
+    return f"{course_label or _course_label_from_student(student)} {student.batch or 'Unbatched'}".strip()
+
+
+def _course_label_from_batch_text(batch_text):
+    text = str(batch_text or '').upper()
+    if 'IMCA' in text or 'INTEGRATED MCA' in text:
+        return 'IMCA'
+    if 'MCA' in text:
+        return 'MCA'
+    if 'MBA' in text:
+        return 'MBA'
+    for code in ('CSE', 'ME', 'CE', 'EEE', 'ECE', 'ECM'):
+        if re.search(rf'(^|\s){code}(\s|$)', text):
+            return code
+    return ''
+
 
 @app.route('/api/analytics/mentor/<int:mentor_id>', methods=['GET'])
 def api_get_mentor_analytics(mentor_id):
@@ -2911,10 +3192,21 @@ def api_get_mentor_analytics(mentor_id):
                     "compliance_modifier": sa.compliance_modifier,
                     "adjusted_risk": sa.adjusted_risk
                 }
+            batch_obj = Batch.query.get(m.batch_id) if m.batch_id else None
+            course_obj = Course.query.get(batch_obj.course_id) if batch_obj and batch_obj.course_id else None
+            course_label = get_display_course_name(batch_obj, course_obj.name) if batch_obj and course_obj else _course_label_from_student(m)
+            batch_label = (
+                f"{course_label} {batch_obj.start_year}-{batch_obj.end_year}"
+                if batch_obj else _display_batch_label_from_student(m, course_label)
+            )
             data.append({
                 "student_id": m.admission_number,
                 "name": m.full_name,
                 "batch": m.batch or "",
+                "course": course_label,
+                "course_label": course_label,
+                "batch_label": batch_label,
+                "batch_id": m.batch_id,
                 "risk_score": metrics.get("risk_score", 0.0) or 0.0,
                 "attendance_trend": metrics.get("attendance_slope", 0.0) or 0.0,
                 "marks_trend": metrics.get("marks_slope", 0.0) or 0.0,
@@ -2922,7 +3214,11 @@ def api_get_mentor_analytics(mentor_id):
                 "ml_risk_probability": metrics.get("ml_risk_probability", 0.0) or 0.0,
                 "adjusted_risk": metrics.get("adjusted_risk", 0.0) or 0.0,
                 "attendance_percentage": metrics.get("attendance_percentage", 0.0) or 0.0,
-                "avg_internal_marks": metrics.get("avg_internal_marks", 0.0) or 0.0
+                "avg_internal_marks": metrics.get("avg_internal_marks", 0.0) or 0.0,
+                "private_note_count": MentorPrivateNote.query.filter_by(
+                    student_admission_number=m.admission_number,
+                    mentor_id=mentor_id
+                ).count()
             })
             
         return jsonify({'success': True, 'data': data}), 200
@@ -2984,6 +3280,7 @@ def api_get_mentors_view():
                 # Extract years from batch label (handles both "MCA 2024-2026" and "2024-2026")
                 from services.batch_service import extract_year_range
                 target_years = extract_year_range(batch)
+                target_course = _course_label_from_batch_text(batch)
                 
                 if target_years:
                     # Match by year range instead of exact batch string
@@ -2996,16 +3293,37 @@ def api_get_mentors_view():
                             )
                         )
                     )
+                    if target_course in {'MCA', 'IMCA', 'MBA'}:
+                        batch_query = batch_query.filter(
+                            db.or_(
+                                Student.batch.ilike(f"%{target_course}%"),
+                                Student.admission_number.ilike(f"%{target_course}%"),
+                                Student.branch.ilike(f"%{target_course}%"),
+                            )
+                        )
             
             mentees = batch_query.all()
             
+            mentee_rows = []
+            for s in mentees:
+                batch_obj = Batch.query.get(s.batch_id) if s.batch_id else None
+                course_obj = Course.query.get(batch_obj.course_id) if batch_obj and batch_obj.course_id else None
+                course_label = get_display_course_name(batch_obj, course_obj.name) if batch_obj and course_obj else _course_label_from_student(s)
+                mentee_rows.append({
+                    'admission_number': s.admission_number,
+                    'name': s.full_name,
+                    'batch': s.batch,
+                    'course': course_label,
+                    'batch_label': f"{course_label} {batch_obj.start_year}-{batch_obj.end_year}" if batch_obj else _display_batch_label_from_student(s, course_label),
+                })
+
             data.append({
                 'id': m.id,
                 'name': m.name,
                 'designation': m.designation,
                 'total_load': total_load,
                 'batch_mentee_count': len(mentees),
-                'mentees': [{'admission_number': s.admission_number, 'name': s.full_name, 'batch': s.batch} for s in mentees]
+                'mentees': mentee_rows
             })
             
         # Find unassigned students using the same flexible filter
@@ -3018,6 +3336,7 @@ def api_get_mentors_view():
         if batch:
             from services.batch_service import extract_year_range
             target_years = extract_year_range(batch)
+            target_course = _course_label_from_batch_text(batch)
             if target_years:
                 unassigned_query = unassigned_query.filter(
                     db.or_(
@@ -3028,6 +3347,14 @@ def api_get_mentors_view():
                         )
                     )
                 )
+                if target_course in {'MCA', 'IMCA', 'MBA'}:
+                    unassigned_query = unassigned_query.filter(
+                        db.or_(
+                            Student.batch.ilike(f"%{target_course}%"),
+                            Student.admission_number.ilike(f"%{target_course}%"),
+                            Student.branch.ilike(f"%{target_course}%"),
+                        )
+                    )
              
         unassigned_count = unassigned_query.count()
         
@@ -3732,7 +4059,7 @@ def api_allocate_mentors():
             return jsonify({'success': False, 'message': 'Department required'}), 400
         
         from models import Batch
-        from services.batch_service import extract_year_range, redistribute_mentors
+        from services.batch_service import extract_year_range, redistribute_mentors, get_department_student_filter
 
         # ── Case 1: No batch specified → redistribute ALL students in dept ──
         if not batch_label:
@@ -3765,6 +4092,7 @@ def api_allocate_mentors():
 
         # ── Case 2: Specific batch provided ─────────────────────────────────
         target_years = extract_year_range(batch_label)
+        target_course = _course_label_from_batch_text(batch_label)
         
         if not target_years:
             return jsonify({
@@ -3778,16 +4106,33 @@ def api_allocate_mentors():
         for b in all_batches:
             if (b.start_year == target_years[0] and 
                 b.end_year == target_years[1]):
+                course = Course.query.get(b.course_id) if b.course_id else None
+                batch_course_label = get_display_course_name(b, course.name) if course else ''
+                if target_course and batch_course_label != target_course:
+                    continue
                 # Prefer the batch that actually has students in this department
                 sample_student = Student.query.filter(
-                    Student.branch.ilike(department.strip()),
+                    get_department_student_filter(department),
                     Student.batch_id == b.id
                 ).first()
+                if sample_student and target_course in {'MCA', 'IMCA', 'MBA'}:
+                    sample_student = Student.query.filter(
+                        get_department_student_filter(department),
+                        Student.batch_id == b.id,
+                        db.or_(
+                            Student.batch.ilike(f"%{target_course}%"),
+                            Student.admission_number.ilike(f"%{target_course}%"),
+                            Student.branch.ilike(f"%{target_course}%"),
+                        )
+                    ).first()
                 if sample_student:
                     batch_id = b.id
                     break
+                if target_course:
+                    batch_id = b.id
+                    break
         
-        if not batch_id:
+        if not batch_id and not target_course:
             # Fallback: take any batch with matching years
             for b in all_batches:
                 if (b.start_year == target_years[0] and 
@@ -3802,6 +4147,8 @@ def api_allocate_mentors():
             }), 404
         
         clean_batch_label = f"{target_years[0]}-{target_years[1]}"
+        if target_course:
+            clean_batch_label = f"{target_course} {clean_batch_label}"
         
         result = redistribute_mentors(
             department=department,
@@ -4007,6 +4354,19 @@ def api_get_alumni_mentor_notes(admission_number):
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
+@app.route('/api/admin/alumni/<string:admission_number>/details', methods=['GET'])
+def api_get_alumni_details(admission_number):
+    """Get the complete alumni profile including original student, academic, and mentoring details."""
+    try:
+        sync_passed_out_students_to_alumni()
+        details = _serialize_alumni_detail(admission_number)
+        if not details:
+            return jsonify({'success': False, 'message': 'Alumni record not found'}), 404
+        return jsonify({'success': True, 'data': details}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @app.route('/api/admin/alumni/department/<department>/batches', methods=['GET'])
 def api_get_alumni_by_department_batches(department):
     """Get batches for a specific department with alumni counts"""
@@ -4106,6 +4466,12 @@ init_smart_planner(app)
 SYSTEM_SLOTS = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"]   # 9 AM – 5 PM
 MENTOR_SLOTS = ["17:00", "18:00"]                                                            # 5 PM – 7 PM
 ALL_SLOTS    = SYSTEM_SLOTS + MENTOR_SLOTS
+
+
+def _default_google_meet_link():
+    # A real Google Meet room code requires Google Calendar/Meet OAuth.
+    # This gives online sessions a one-click Meet entry point when no link is pasted.
+    return "https://meet.google.com/new"
 
 
 def _is_mentor_busy_from_timetable(mentor_id, weekday_name, slot_hour):
@@ -4270,6 +4636,7 @@ def api_book_session():
         slot_type = 'mentor' if time_slot in MENTOR_SLOTS else 'system'
         # System slots: auto-approve; Mentor slots stay Pending
         status = 'Approved' if slot_type == 'system' else 'Pending'
+        is_online = str(session_type or '').strip().lower() == 'online'
 
         session = MentoringSession(
             student_admission_number=admission_number,
@@ -4279,6 +4646,7 @@ def api_book_session():
             slot_type=slot_type,
             session_type=session_type,
             status=status,
+            meeting_link=_default_google_meet_link() if is_online and status == 'Approved' else '',
             notes=notes,
         )
         db.session.add(session)
@@ -4393,6 +4761,7 @@ def api_mentor_sessions(mentor_id):
             student_name = s.student.full_name if s.student else s.student_admission_number
             result.append({
                 'id': s.id,
+                'mentor_id': s.mentor_id,
                 'date': s.date.isoformat(),
                 'time_slot': s.time_slot,
                 'slot_type': s.slot_type,
@@ -4426,13 +4795,35 @@ def api_respond_session(session_id):
         session = MentoringSession.query.get(session_id)
         if not session:
             return jsonify({'success': False, 'message': 'Session not found'}), 404
-        if session.mentor_id != int(mentor_id):
+        student_current_mentor_id = getattr(session.student, 'mentor_id', None) if session.student else None
+        requested_mentor_id = str(mentor_id or '').strip()
+        allowed_mentor_ids = {
+            str(value)
+            for value in (session.mentor_id, student_current_mentor_id)
+            if value is not None and str(value).strip()
+        }
+        if not requested_mentor_id or requested_mentor_id not in allowed_mentor_ids:
             return jsonify({'success': False, 'message': 'Unauthorized'}), 403
 
         if action == 'approve':
             session.status = 'Approved'
-            if meeting_link:
-                session.meeting_link = meeting_link
+            if str(session.session_type or '').strip().lower() == 'online':
+                session.meeting_link = meeting_link.strip() if meeting_link and meeting_link.strip() else (session.meeting_link or _default_google_meet_link())
+            elif meeting_link:
+                session.meeting_link = meeting_link.strip()
+            try:
+                db.session.add(Notification(
+                    student_id=session.student_admission_number,
+                    title='Mentoring Session Approved',
+                    message=(
+                        f'Your mentoring session on {session.date.isoformat()} at {session.time_slot} was approved.'
+                        + (f' Join: {session.meeting_link}' if session.meeting_link else '')
+                    ),
+                    type='session',
+                    is_read=False,
+                ))
+            except Exception:
+                pass
         elif action == 'reject':
             session.status = 'Rejected'
         elif action == 'cancel':
@@ -4446,6 +4837,8 @@ def api_respond_session(session_id):
             if message:
                 session.notes = (session.notes or '') + f'\n[Mentor Response: {message}]'
             session.status = 'Approved'
+            if str(session.session_type or '').strip().lower() == 'online' and not session.meeting_link:
+                session.meeting_link = _default_google_meet_link()
         else:
             return jsonify({'success': False, 'message': 'Invalid action'}), 400
 
@@ -4472,7 +4865,13 @@ def api_session_mark_status(session_id):
         session = MentoringSession.query.get(session_id)
         if not session:
             return jsonify({'success': False, 'message': 'Session not found'}), 404
-        if mentor_id is not None and str(session.mentor_id) != str(mentor_id):
+        student_current_mentor_id = getattr(session.student, 'mentor_id', None) if session.student else None
+        allowed_mentor_ids = {
+            str(value)
+            for value in (session.mentor_id, student_current_mentor_id)
+            if value is not None and str(value).strip()
+        }
+        if mentor_id is not None and str(mentor_id) not in allowed_mentor_ids:
             return jsonify({'success': False, 'message': 'Unauthorized'}), 403
         if session.status != 'Approved':
             return jsonify({'success': False, 'message': 'Only approved sessions can be marked for attendance'}), 400
@@ -5724,19 +6123,22 @@ def _fallback_study_plan(ctx: dict) -> str:
 @app.route('/api/mentor/private-notes/<string:student_id>', methods=['GET'])
 def api_get_mentor_private_notes(student_id):
     try:
-        mentor_id = request.args.get('mentor_id', type=int)
+        mentor_id, mentor_error = _resolve_private_note_mentor_id(request.args.get('mentor_id'))
+        if mentor_error:
+            return jsonify({'success': False, 'message': mentor_error}), 400
         if not mentor_id:
             return jsonify({'success': False, 'message': 'mentor_id is required'}), 400
 
         student_key = student_id.upper()
-        student = Student.query.get(student_key)
-        alumni = AlumniStudent.query.filter_by(admission_number=student_key).first()
-
+        student, student_error = _resolve_private_note_student(student_key, mentor_id)
         if student:
-            if student.mentor_id != mentor_id:
+            student_key = student.admission_number
+        else:
+            alumni = AlumniStudent.query.filter_by(admission_number=student_key).first()
+            if not alumni:
+                return jsonify({'success': False, 'message': student_error or 'Student not found'}), 404
+            if str(alumni.mentor_id or '') != str(mentor_id):
                 return jsonify({'success': False, 'message': 'Unauthorized'}), 403
-        elif not alumni or alumni.mentor_id != mentor_id:
-            return jsonify({'success': False, 'message': 'Student not found'}), 404
 
         notes = MentorPrivateNote.query.filter_by(
             student_admission_number=student_key,
@@ -5762,11 +6164,51 @@ def api_get_mentor_private_notes(student_id):
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
+def _resolve_private_note_mentor_id(raw_mentor_id):
+    raw = str(raw_mentor_id or '').strip()
+    if not raw:
+        return None, 'mentor_id is required'
+
+    mentor = None
+    if raw.isdigit():
+        mentor = Faculty.query.get(int(raw))
+    if not mentor:
+        mentor = Faculty.query.filter_by(username=raw).first()
+    if not mentor:
+        mentor = Faculty.query.filter(db.func.upper(Faculty.username) == raw.upper()).first()
+
+    if not mentor:
+        return None, 'Mentor not found'
+    return mentor.id, None
+
+
+def _resolve_private_note_student(student_id, mentor_id):
+    student_key = str(student_id or '').strip().upper()
+    if not student_key:
+        return None, 'student_id is required'
+
+    student = Student.query.get(student_key)
+    if not student:
+        student = Student.query.filter(
+            db.func.upper(Student.roll_number) == student_key
+        ).first()
+
+    if not student:
+        return None, 'Student not found'
+
+    if str(student.mentor_id or '') != str(mentor_id):
+        return None, 'This student is not assigned to you'
+
+    return student, None
+
+
 @app.route('/api/mentor/private-notes', methods=['POST'])
 def api_create_mentor_private_note():
     try:
         data = request.get_json() or {}
-        mentor_id = data.get('mentor_id')
+        mentor_id, mentor_error = _resolve_private_note_mentor_id(data.get('mentor_id'))
+        if mentor_error:
+            return jsonify({'success': False, 'message': mentor_error}), 400
         student_id = (data.get('student_id') or '').strip().upper()
         content = (data.get('content') or '').strip()
         session_id = data.get('session_id')
@@ -5775,16 +6217,19 @@ def api_create_mentor_private_note():
         if not mentor_id or not student_id or not content:
             return jsonify({'success': False, 'message': 'mentor_id, student_id and content are required'}), 400
 
-        student = Student.query.get(student_id)
-        if not student:
-            return jsonify({'success': False, 'message': 'Student not found'}), 404
-        if str(student.mentor_id) != str(mentor_id):
-            return jsonify({'success': False, 'message': 'This student is not assigned to you'}), 403
-
         if session_id:
             session_row = MentoringSession.query.get(session_id)
-            if not session_row or session_row.student_admission_number != student_id or str(session_row.mentor_id) != str(mentor_id):
+            submitted_student = student_id
+            session_student = str(session_row.student_admission_number or '').strip().upper() if session_row else ''
+            if not session_row or session_student != submitted_student or str(session_row.mentor_id) != str(mentor_id):
                 return jsonify({'success': False, 'message': 'Invalid session for this mentor/student pair'}), 400
+            student_id = session_student
+        else:
+            student, error = _resolve_private_note_student(student_id, mentor_id)
+            if error:
+                status = 404 if error == 'Student not found' else 403
+                return jsonify({'success': False, 'message': error}), status
+            student_id = student.admission_number
 
         if note_type not in ['private', 'session', 'abnormality']:
             note_type = 'private'
@@ -5994,9 +6439,11 @@ def api_mentor_book_session():
             return jsonify({'success': False, 'message': 'This student is not assigned to you'}), 403
 
         # Validate GMeet link for online sessions
-        if session_type == 'Online' and meeting_link:
-            if not (meeting_link.startswith('http://') or meeting_link.startswith('https://')):
+        if session_type == 'Online':
+            if meeting_link and not (meeting_link.startswith('http://') or meeting_link.startswith('https://')):
                 meeting_link = 'https://' + meeting_link
+            if not meeting_link:
+                meeting_link = _default_google_meet_link()
 
         from datetime import date as date_obj
         parsed_date = date_obj.fromisoformat(session_date)
@@ -6272,6 +6719,71 @@ def _average_numeric(values):
     return round(sum(nums) / len(nums), 2) if nums else None
 
 
+def _internal_field_from_exam_type(exam_type):
+    normalized = re.sub(r'[^a-z0-9]+', '', str(exam_type or '').strip().lower())
+    mapping = {
+        'internal1': 'internal1',
+        'internals1': 'internal1',
+        'ia1': 'internal1',
+        'internal2': 'internal2',
+        'internals2': 'internal2',
+        'ia2': 'internal2',
+        'internal3': 'internal3',
+        'internals3': 'internal3',
+        'ia3': 'internal3',
+    }
+    return mapping.get(normalized)
+
+
+def _restore_missing_internals_from_handler_marks(student_id, semester=None):
+    student_id = str(student_id or '').strip().upper()
+    if not student_id:
+        return 0
+
+    query = StudentMark.query.filter_by(student_id=student_id)
+    if semester is not None:
+        query = query.filter_by(semester=int(semester))
+
+    restored = 0
+    for mark in query.all():
+        subject_code = str(mark.subject_code or '').strip().upper()
+        if not subject_code:
+            continue
+
+        internal_marks = db.session.query(InternalMark, Subject).join(
+            Subject, Subject.id == InternalMark.subject_id
+        ).filter(
+            InternalMark.student_id == student_id
+        ).all()
+        for internal_mark, subject in internal_marks:
+            catalog_code = _subject_code_from_subject_name(subject.name)
+            if catalog_code != subject_code:
+                continue
+            field_name = _internal_field_from_exam_type(internal_mark.exam_type)
+            if not field_name or getattr(mark, field_name, None) is not None:
+                continue
+            mark_value = _valid_metric(internal_mark.marks)
+            if mark_value is None:
+                continue
+            setattr(mark, field_name, mark_value)
+            restored += 1
+
+        handler_marks = SubjectHandlerMark.query.filter(
+            SubjectHandlerMark.student_id == student_id,
+            func.upper(SubjectHandlerMark.subject_code) == subject_code
+        ).all()
+        for handler_mark in handler_marks:
+            field_name = _internal_field_from_exam_type(handler_mark.exam_type)
+            if not field_name or getattr(mark, field_name, None) is not None:
+                continue
+            mark_value = _valid_metric(handler_mark.marks_obtained)
+            if mark_value is None:
+                continue
+            setattr(mark, field_name, mark_value)
+            restored += 1
+    return restored
+
+
 def _subject_code_from_subject_name(subject_name):
     raw_name = str(subject_name or '').strip().upper()
     match = re.match(r'^([A-Z]{2,5}\d{3,6}[A-Z]?)', raw_name)
@@ -6290,6 +6802,8 @@ def _catalog_subjects_for_student(student, semester):
 
 def _build_semester_progression_payload(student):
     student_id = student.admission_number.upper()
+    if _restore_missing_internals_from_handler_marks(student_id):
+        db.session.flush()
     marks_rows = StudentMark.query.filter_by(student_id=student_id).all()
     attendance_rows = Attendance.query.filter_by(student_admission_number=student_id).all()
     current_semester = _calculate_current_semester_for_student(student)
@@ -6338,12 +6852,24 @@ def _build_semester_progression_payload(student):
         subject = ensure_subject(row.semester, row.subject_code)
         if not subject:
             continue
-        subject['internal1'] = _valid_metric(row.internal1)
-        subject['internal2'] = _valid_metric(row.internal2)
-        subject['internal3'] = _valid_metric(row.internal3)
-        subject['internal_avg'] = _normalized_internal_score(row)
-        subject['university_mark'] = _valid_metric(row.university_mark)
-        subject['combined_score'] = _subject_combined_score(row)
+        internal1 = _valid_metric(row.internal1)
+        internal2 = _valid_metric(row.internal2)
+        internal3 = _valid_metric(row.internal3)
+        internal_avg = _normalized_internal_score(row)
+        university_mark = _valid_metric(row.university_mark)
+        combined_score = _subject_combined_score(row)
+        if internal1 is not None:
+            subject['internal1'] = internal1
+        if internal2 is not None:
+            subject['internal2'] = internal2
+        if internal3 is not None:
+            subject['internal3'] = internal3
+        if internal_avg is not None:
+            subject['internal_avg'] = internal_avg
+        if university_mark is not None:
+            subject['university_mark'] = university_mark
+        if combined_score is not None:
+            subject['combined_score'] = combined_score
 
     for row in attendance_rows:
         if current_semester is not None and row.semester is not None and int(row.semester) > int(current_semester):
@@ -6505,22 +7031,50 @@ def api_get_student_marks_public(admission_number):
     """Return all StudentMark rows for a student as flat list. Used by React UI."""
     try:
         from models import StudentMark
-        student = Student.query.get(admission_number.upper())
-        marks = StudentMark.query.filter_by(student_id=admission_number.upper()).order_by(StudentMark.semester.asc(), StudentMark.subject_code.asc()).all()
-        data = []
+        student_id = admission_number.upper()
+        student = Student.query.get(student_id)
+        restored_internals = _restore_missing_internals_from_handler_marks(student_id)
+        if restored_internals:
+            db.session.commit()
+        marks = StudentMark.query.filter_by(student_id=student_id).order_by(StudentMark.semester.asc(), StudentMark.subject_code.asc()).all()
+        merged_marks = {}
         for m in marks:
-            subject_meta = _resolve_subject_catalog_entry(m.subject_code, semester=m.semester, student=student)
+            subject_code = str(m.subject_code or '').strip().upper()
+            key = (m.semester, subject_code)
+            if key not in merged_marks:
+                merged_marks[key] = {
+                    'subject_code': subject_code,
+                    'semester': m.semester,
+                    'internal1': None,
+                    'internal2': None,
+                    'internal3': None,
+                    'university_mark': None,
+                    'university_grade': None,
+                    'is_verified': True,
+                }
+            merged = merged_marks[key]
+            for field_name in ('internal1', 'internal2', 'internal3', 'university_mark'):
+                value = getattr(m, field_name, None)
+                if merged[field_name] is None and value is not None:
+                    merged[field_name] = value
+            if merged['university_grade'] is None and m.exam_type and m.university_mark is None:
+                merged['university_grade'] = m.exam_type
+            merged['is_verified'] = bool(merged['is_verified'] and getattr(m, 'is_verified', False))
+
+        data = []
+        for m in sorted(merged_marks.values(), key=lambda row: (row.get('semester') or 0, row.get('subject_code') or '')):
+            subject_meta = _resolve_subject_catalog_entry(m['subject_code'], semester=m['semester'], student=student)
             data.append({
-                'subject_code':     m.subject_code,
+                'subject_code':     m['subject_code'],
                 'course_name':      subject_meta['course_name'],
                 'display_name':     subject_meta['display_name'],
-                'semester':         m.semester,
-                'internal1':        m.internal1,
-                'internal2':        m.internal2,
-                'internal3':        m.internal3,
-                'university_mark':  m.university_mark,
-                'university_grade': m.exam_type if m.exam_type and not m.university_mark else None,
-                'is_verified':      m.is_verified if hasattr(m, 'is_verified') else False,
+                'semester':         m['semester'],
+                'internal1':        m['internal1'],
+                'internal2':        m['internal2'],
+                'internal3':        m['internal3'],
+                'university_mark':  m['university_mark'],
+                'university_grade': m['university_grade'],
+                'is_verified':      m['is_verified'],
             })
         return jsonify({'success': True, 'data': data}), 200
     except Exception as e:
@@ -6608,31 +7162,43 @@ def api_marksheet_upload():
         if not extracted:
             return jsonify({'success': False, 'message': 'Could not extract any subject marks from PDF. Please check the format.'}), 200
 
-        # Delete old marks for this semester if force
-        if force and existing:
-            for old in existing:
-                db.session.delete(old)
+        existing_by_code = {
+            str(row.subject_code or '').strip().upper(): row
+            for row in existing
+            if str(row.subject_code or '').strip()
+        }
 
-        # Save extracted marks
+        # Merge extracted university marks into existing rows. Do not delete
+        # semester rows here, because subject handlers may already have stored
+        # internal1/internal2/internal3 marks on them.
         saved = []
         for item in extracted:
-            sm = StudentMark(
-                student_id=student_id,
-                subject_code=item['subj'],
-                semester=int(semester),
-                university_mark=item['mark'],
-            )
-            db.session.add(sm)
+            subject_code = str(item['subj']).strip().upper()
+            sm = existing_by_code.get(subject_code)
+            if not sm:
+                sm = StudentMark(
+                    student_id=student_id,
+                    subject_code=subject_code,
+                    semester=int(semester),
+                )
+                db.session.add(sm)
+                existing_by_code[subject_code] = sm
+            sm.university_mark = item['mark']
+            sm.exam_type = None
+            sm.is_verified = False
             saved.append({
-                **item,
-                **_resolve_subject_catalog_entry(item['subj'], semester=semester, student=student),
+                'subj': subject_code,
+                'mark': item['mark'],
+                **_resolve_subject_catalog_entry(subject_code, semester=semester, student=student),
             })
 
+        restored_internals = _restore_missing_internals_from_handler_marks(student_id, semester=int(semester))
         db.session.commit()
         return jsonify({
             'success': True,
             'message': f'Extracted and saved {len(saved)} subjects for Semester {semester}.',
             'extracted': saved,
+            'restored_internal_marks': restored_internals,
             'raw_text_preview': raw_text[:800] if 'raw_text' in locals() else ''
         }), 200
 
@@ -6866,11 +7432,13 @@ def api_mentor_verify_marks(student_id, semester):
         if not marks:
             return jsonify({'success': False, 'message': 'No marks found to verify'}), 404
             
+        restored_internals = _restore_missing_internals_from_handler_marks(student_id.upper(), semester=semester)
         for m in marks:
             m.is_verified = (action == 'verify')
             
         db.session.commit()
-        return jsonify({'success': True, 'message': f'Marks {"verified" if action == "verify" else "unlocked"} successfully.'}), 200
+        restored_msg = f' Restored {restored_internals} missing internal mark(s).' if restored_internals else ''
+        return jsonify({'success': True, 'message': f'Marks {"verified" if action == "verify" else "unlocked"} successfully.{restored_msg}'}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -7039,6 +7607,46 @@ def _playground_visible_for_student(note, student):
     return True
 
 
+def _student_timetable_handler_rows(student):
+    """Return timetable rows for handlers assigned to the student's exact class scope."""
+    if not student:
+        return []
+
+    rows = Timetable.query.filter(Timetable.handler_id.isnot(None)).all()
+    matched = []
+    for row in rows:
+        dept_matches = not row.department or _departments_match_simple(row.department, student.branch)
+        batch_matches = not row.batch or not student.batch or _scope_batch_matches(row.batch, student.batch)
+        if dept_matches and batch_matches:
+            matched.append(row)
+    return matched
+
+
+def _handler_teaches_student_class(handler_id, student, subject=None):
+    subject_norm = _norm_subject(subject) if subject else ''
+    for row in _student_timetable_handler_rows(student):
+        if row.handler_id != handler_id:
+            continue
+        if subject_norm and _norm_subject(row.subject) != subject_norm:
+            continue
+        return True
+    return False
+
+
+def _faculty_has_subject_handler_access(faculty_id):
+    faculty = Faculty.query.get(faculty_id)
+    if not faculty:
+        return False
+    designation = str(faculty.designation or '').strip().lower()
+    return (
+        bool(getattr(faculty, 'is_subject_handler', False))
+        or 'subject handler' in designation
+        or 'subject-handler' in designation
+        or SubjectAllocation.query.filter_by(faculty_id=faculty_id).first() is not None
+        or Timetable.query.filter_by(handler_id=faculty_id).first() is not None
+    )
+
+
 def _extract_multiple_student_targets(raw_value):
     raw = str(raw_value or '').strip().upper()
     if not raw:
@@ -7112,14 +7720,35 @@ def _queue_personalized_note_alert(student, subject_code, note_title, sender_nam
 def api_get_subject_handlers(department):
     try:
         dept = str(department or '').strip()
-        handlers = Faculty.query.filter(
-            Faculty.is_subject_handler == True,
-            Faculty.status == 'Live'
-        ).all()
-        filtered = [h for h in handlers if _departments_match_simple(h.department, dept)]
+        student_id = str(request.args.get('student_id') or '').strip().upper()
+        student = Student.query.get(student_id) if student_id else None
+
+        handler_subjects = {}
+        if student:
+            for row in _student_timetable_handler_rows(student):
+                handler_subjects.setdefault(row.handler_id, set()).add(str(row.subject or '').strip())
+
+        handlers = Faculty.query.filter(Faculty.status == 'Live').all()
+        filtered = []
+        for h in handlers:
+            if not _faculty_has_subject_handler_access(h.id):
+                continue
+            if student:
+                if h.id in handler_subjects:
+                    filtered.append(h)
+            elif _departments_match_simple(h.department, dept):
+                filtered.append(h)
+
+        filtered.sort(key=lambda row: ((row.name or '').strip().lower(), row.id))
         return jsonify({
             'success': True,
-            'data': [{'id': h.id, 'name': h.name, 'designation': h.designation} for h in filtered]
+            'data': [{
+                'id': h.id,
+                'name': h.name,
+                'designation': h.designation,
+                'department': h.department,
+                'subjects': sorted(s for s in handler_subjects.get(h.id, set()) if s),
+            } for h in filtered]
         }), 200
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -7167,10 +7796,14 @@ def api_send_handler_message(admission_number):
         if not handler_id:
             return jsonify({'success': False, 'message': 'Please select a subject handler'}), 400
         handler = Faculty.query.get(handler_id)
-        if not handler or not handler.is_subject_handler:
+        if not handler or not _faculty_has_subject_handler_access(handler_id):
             return jsonify({'success': False, 'message': 'Subject handler not found'}), 404
 
         message = (request.form.get('message') or '').strip()
+        subject = (request.form.get('subject') or '').strip() or 'General'
+        if not _handler_teaches_student_class(handler_id, student):
+            return jsonify({'success': False, 'message': 'Selected faculty is not assigned to your class'}), 403
+
         attachment_path = None
         file = request.files.get('file')
         if file and file.filename:
@@ -7187,7 +7820,7 @@ def api_send_handler_message(admission_number):
         row = SubjectHandlerMessage(
             student_id=sid,
             handler_id=handler_id,
-            subject=(request.form.get('subject') or '').strip() or 'General',
+            subject=subject,
             category=(request.form.get('category') or 'Academic').strip() or 'Academic',
             message=message or 'Attachment shared',
             attachment_path=attachment_path,
@@ -7242,8 +7875,14 @@ def api_handler_messages_send():
             return jsonify({'success': False, 'message': 'handler_id, student_id and message are required'}), 400
 
         handler = Faculty.query.get(handler_id)
-        if not handler or not handler.is_subject_handler:
+        if not handler or not _faculty_has_subject_handler_access(handler_id):
             return jsonify({'success': False, 'message': 'Subject handler not found'}), 404
+        student = Student.query.get(student_id)
+        if not student:
+            return jsonify({'success': False, 'message': 'Student not found'}), 404
+        existing_thread = SubjectHandlerMessage.query.filter_by(handler_id=handler_id, student_id=student_id).first() is not None
+        if not existing_thread and not _handler_teaches_student_class(handler_id, student):
+            return jsonify({'success': False, 'message': 'This student is not in your assigned class for the selected subject'}), 403
 
         row = SubjectHandlerMessage(
             student_id=student_id,
@@ -8125,15 +8764,31 @@ def _mentor_students_core(mentor_id):
             mentor_id=mentor_id,
             escalated=False
         ).count()
+        private_note_count = MentorPrivateNote.query.filter_by(
+            student_admission_number=s.admission_number,
+            mentor_id=mentor_id
+        ).count()
+        batch_obj = Batch.query.get(s.batch_id) if s.batch_id else None
+        course_obj = Course.query.get(batch_obj.course_id) if batch_obj and batch_obj.course_id else None
+        course_label = get_display_course_name(batch_obj, course_obj.name) if batch_obj and course_obj else _course_label_from_student(s)
+        batch_label = (
+            f"{course_label} {batch_obj.start_year}-{batch_obj.end_year}"
+            if batch_obj else _display_batch_label_from_student(s, course_label)
+        )
         data.append({
             'student_id': s.admission_number,
             'student_name': s.full_name,
             'department': s.branch,
             'batch': s.batch,
+            'course': course_label,
+            'course_label': course_label,
+            'batch_label': batch_label,
+            'batch_id': s.batch_id,
             'attendance_percent': round(attendance_percent, 2),
             'risk_score': round(risk_score, 2),
             'risk_level': _risk_band(risk_score),
             'pending_interventions': pending_interventions,
+            'private_note_count': private_note_count,
         })
     data.sort(key=lambda x: x['risk_score'], reverse=True)
     return data
@@ -9475,3 +10130,6 @@ if __name__ == '__main__':
         print(f"Warning: APScheduler initialization failed: {e}")
     
     app.run(debug=True, port=5000)
+    accommodation_type = other_info.accommodation_type if other_info else None
+    is_hosteler = str(accommodation_type or "").strip().lower() == "hosteler"
+    is_day_scholar = str(accommodation_type or "").strip().lower() == "day scholar"

@@ -64,7 +64,7 @@ def compute_student_analytics(student, attendance_records, internal_marks):
             if len(ordered_scores) >= 2:
                 slope = ordered_scores[-1] - ordered_scores[0]
                 sum_slope += slope
-                if slope < -15:
+                if slope < 0:
                     marks_drop_flag = 1
             else:
                 sum_slope += 0.0
@@ -112,7 +112,7 @@ def compute_student_analytics(student, attendance_records, internal_marks):
 
     # 5. Improvement Detection
     status = "Stable"
-    if risk_score >= 60:
+    if risk_score >= 60 or marks_slope < 0 or att_percent < 75 or att_slope < -0.05:
         status = "Declining"
     elif att_slope > 0.02 and marks_slope > 5:
         status = "Improving"

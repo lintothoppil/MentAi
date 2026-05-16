@@ -29,6 +29,8 @@ type StudentData = {
   attendance_percentage: number;
   risk_score: number;
   performance_trend: string;
+  failed_subject_count?: number;
+  failed_subjects?: Record<string, number>;
   pending_remedial_classes: number;
   recommended_mentor_session?: boolean;
   latest_remedial_status?: string | null;
@@ -72,6 +74,9 @@ type MonitorDetail = {
   attendance_percentage: number;
   risk_score: number;
   performance_trend: string;
+  failed_subject_count?: number;
+  failed_subjects?: Record<string, number>;
+  private_mentor_notes?: Array<{ type: string; content: string; created_at: string | null }>;
   recommended_mentor_session: boolean;
   remedial_classes: Array<{
     id: number;
@@ -351,7 +356,8 @@ export default function MentorAIReportsPage() {
   };
 
   const performanceData = students.slice(0, 10).map((student) => ({
-    name: student.student_id,
+    name: student.student_name || student.student_id,
+    admission: student.student_id,
     score: 100 - student.risk_score,
     attendance: student.attendance_percentage,
   }));
@@ -681,6 +687,11 @@ export default function MentorAIReportsPage() {
                               {getTrendIcon(student.performance_trend)}
                               <span className="capitalize">{student.performance_trend}</span>
                             </div>
+                            {student.failed_subject_count ? (
+                              <div className="mt-1 text-xs font-medium text-red-600">
+                                {student.failed_subject_count} failed subject{student.failed_subject_count === 1 ? "" : "s"}
+                              </div>
+                            ) : null}
                           </td>
                           <td className="p-3">
                             {student.pending_remedial_classes > 0 ? (
@@ -909,6 +920,18 @@ export default function MentorAIReportsPage() {
                           <ul className="space-y-1 mt-1">
                             {monitorDetail.recommended_actions.map((item) => (
                               <li key={item} className="text-sm">{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {monitorDetail.private_mentor_notes && monitorDetail.private_mentor_notes.length > 0 ? (
+                        <div className="mt-3">
+                          <p className="text-sm font-semibold text-amber-800">Private mentor notes included</p>
+                          <ul className="space-y-1 mt-1">
+                            {monitorDetail.private_mentor_notes.slice(0, 3).map((note, index) => (
+                              <li key={`${note.created_at || "note"}-${index}`} className="text-sm line-clamp-2">
+                                {note.content}
+                              </li>
                             ))}
                           </ul>
                         </div>

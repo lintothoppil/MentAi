@@ -26,10 +26,10 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 
-import { Search, Users, GraduationCap, Building2, Calendar, Mail, User, Eye, School, BookOpen, CheckCircle2, UserPlus } from 'lucide-react';
+import { Search, Users, GraduationCap, Building2, Calendar, Mail, User, Eye, School, BookOpen, CheckCircle2, UserPlus, ClipboardList, TrendingUp } from 'lucide-react';
 
 const API_BASE = "http://localhost:5000";
 
@@ -76,6 +76,109 @@ interface AlumniMentorNote {
   transferred_at: string | null;
 }
 
+interface AlumniDetails {
+  summary: {
+    admission_number: string;
+    name: string;
+    email: string;
+    department: string;
+    course_name: string;
+    batch_start_year: number | null;
+    batch_end_year: number | null;
+    passout_year: number | null;
+    alumni_since: string | null;
+    student_status: string;
+    mentor_name: string | null;
+  };
+  profile: {
+    roll_number: string | null;
+    date_of_birth: string | null;
+    age: number | null;
+    blood_group: string | null;
+    mobile_number: string | null;
+    religion: string | null;
+    diocese: string | null;
+    parish: string | null;
+    caste_category: string | null;
+    permanent_address: string | null;
+    contact_address: string | null;
+    photo_path: string | null;
+    mentor_remarks: string | null;
+    profile_completed: boolean;
+  };
+  academics: {
+    cgpa: number | null;
+    sgpa: number | null;
+    tenth_school: string | null;
+    tenth_board: string | null;
+    tenth_percentage: number | null;
+    twelfth_school: string | null;
+    twelfth_board: string | null;
+    twelfth_percentage: number | null;
+    ug_college: string | null;
+    ug_university: string | null;
+    ug_percentage: number | null;
+    medium_of_instruction: string | null;
+    entrance_rank: string | null;
+    nature_of_admission: string | null;
+    verified_university_results: number;
+    total_university_results: number;
+    internal_mark_records: number;
+  };
+  mentoring: {
+    mentor_history: Array<{
+      mentor_id: number | null;
+      mentor_name: string;
+      start_date: string | null;
+      end_date: string | null;
+      created_at: string | null;
+    }>;
+    sessions: Array<{
+      id: number;
+      mentor_name: string;
+      date: string | null;
+      time_slot: string | null;
+      slot_type: string | null;
+      session_type: string | null;
+      status: string | null;
+      meeting_link: string | null;
+      notes: string | null;
+      absence_reason: string | null;
+      created_at: string | null;
+    }>;
+  };
+  family: {
+    father_name: string | null;
+    father_profession: string | null;
+    father_mobile: string | null;
+    mother_name: string | null;
+    mother_profession: string | null;
+    mother_mobile: string | null;
+    guardian_name: string | null;
+    guardian_mobile: string | null;
+    guardian_address: string | null;
+  };
+  campus_life: {
+    accommodation_type: string | null;
+    staying_with: string | null;
+    hostel_name: string | null;
+    stay_from: string | null;
+    stay_to: string | null;
+    transport_mode: string | null;
+    vehicle_number: string | null;
+  };
+  performance: {
+    attendance_percentage: number | null;
+    attended_classes: number;
+    total_classes: number;
+  };
+  experience: Array<{
+    organization: string | null;
+    job_title: string | null;
+    duration: string | null;
+  }>;
+}
+
 const AdminAlumniPage = () => {
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -93,11 +196,33 @@ const AdminAlumniPage = () => {
   const [loadingNotes, setLoadingNotes] = useState(false);
   const [selectedAlumniRecord, setSelectedAlumniRecord] = useState<Alumni | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [alumniDetails, setAlumniDetails] = useState<AlumniDetails | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   const openAlumniDetails = (alumni: Alumni) => {
     setSelectedAlumniRecord(alumni);
+    setAlumniDetails(null);
     setDetailsOpen(true);
+    fetchAlumniDetails(alumni.admission_number);
     fetchAlumniNotes(alumni.admission_number);
+  };
+
+  const fetchAlumniDetails = async (admissionNumber: string) => {
+    setLoadingDetails(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/admin/alumni/${encodeURIComponent(admissionNumber)}/details`);
+      const data = await response.json();
+      if (data.success) {
+        setAlumniDetails(data.data);
+      } else {
+        setAlumniDetails(null);
+      }
+    } catch (error) {
+      console.error('Error fetching alumni details:', error);
+      setAlumniDetails(null);
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
   const fetchAlumniNotes = async (admissionNumber: string) => {
@@ -250,6 +375,26 @@ const AdminAlumniPage = () => {
     { label: "Attendance", icon: <CheckCircle2 className="h-4 w-4" />, path: "/dashboard/admin/attendance" },
     { label: "Mentorship", icon: <UserPlus className="h-4 w-4" />, path: "/dashboard/admin/mentorship" },
   ];
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return 'Not available';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-IN');
+  };
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return 'Not available';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString('en-IN');
+  };
+
+  const displayValue = (value?: string | number | null) => {
+    if (value === null || value === undefined || value === '') return 'Not available';
+    return value;
+  };
+
+  const isHosteler = (value?: string | null) => (value || '').trim().toLowerCase() === 'hosteler';
+  const isDayScholar = (value?: string | null) => (value || '').trim().toLowerCase() === 'day scholar';
 
   return (
     <DashboardLayout role="admin" roleLabel="Admin Dashboard" navItems={navItems} gradientClass="gradient-admin">
@@ -538,70 +683,280 @@ const AdminAlumniPage = () => {
       </Tabs>
 
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Alumni Details</DialogTitle>
             <DialogDescription>
-              Mentor-private notes are shown here only after the student has been transferred to alumni.
+              Complete alumni profile with transferred student, mentoring, and academic data.
             </DialogDescription>
           </DialogHeader>
           {selectedAlumniRecord && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-medium">Admission Number</h4>
-                  <p>{selectedAlumniRecord.admission_number}</p>
+            <div className="space-y-6">
+              {loadingDetails ? (
+                <div className="rounded-xl border bg-muted/30 p-6 text-sm text-muted-foreground">
+                  Loading alumni profile...
                 </div>
-                <div>
-                  <h4 className="font-medium">Name</h4>
-                  <p>{selectedAlumniRecord.name}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Email</h4>
-                  <p>{selectedAlumniRecord.email}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Department</h4>
-                  <p>{selectedAlumniRecord.department}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Course</h4>
-                  <p>{selectedAlumniRecord.course_name}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Batch</h4>
-                  <p>{selectedAlumniRecord.batch_start_year}-{selectedAlumniRecord.batch_end_year}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Passout Year</h4>
-                  <p>{selectedAlumniRecord.passout_year}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Joined</h4>
-                  <p>{selectedAlumniRecord.created_at}</p>
-                </div>
-              </div>
-              <div className="space-y-3 border-t pt-4">
-                <h4 className="font-medium">Transferred Mentor Notes</h4>
-                {loadingNotes ? (
-                  <p className="text-sm text-muted-foreground">Loading mentor archive...</p>
-                ) : alumniNotes.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No transferred mentor notes found for this alumni record.</p>
-                ) : (
-                  alumniNotes.map((note) => (
-                    <div key={note.id} className="rounded-lg border p-3">
-                      <div className="flex items-center justify-between gap-3 mb-2">
-                        <Badge variant="outline" className="capitalize">{note.note_type}</Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {note.created_at ? new Date(note.created_at).toLocaleString('en-IN') : 'Unknown time'}
-                        </span>
+              ) : alumniDetails ? (
+                <>
+                  <div className="rounded-2xl border bg-gradient-to-r from-slate-50 via-white to-slate-100 p-5">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                            <GraduationCap className="h-7 w-7" />
+                          </div>
+                          <div>
+                            <h3 className="text-2xl font-semibold">{alumniDetails.summary.name}</h3>
+                            <p className="text-sm text-muted-foreground">{alumniDetails.summary.admission_number}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge>{alumniDetails.summary.department}</Badge>
+                          <Badge variant="outline">{alumniDetails.summary.course_name}</Badge>
+                          <Badge variant="secondary">Passout {displayValue(alumniDetails.summary.passout_year)}</Badge>
+                          <Badge variant="outline">{alumniDetails.summary.student_status}</Badge>
+                        </div>
                       </div>
-                      <p className="text-sm font-medium mb-1">{note.mentor_name}</p>
-                      <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                      <div className="grid grid-cols-1 gap-2 text-sm md:min-w-[260px]">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Mail className="h-4 w-4" />
+                          <span>{displayValue(alumniDetails.summary.email)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          <span>Batch {displayValue(alumniDetails.summary.batch_start_year)}-{displayValue(alumniDetails.summary.batch_end_year)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <User className="h-4 w-4" />
+                          <span>Mentor {displayValue(alumniDetails.summary.mentor_name)}</span>
+                        </div>
+                      </div>
                     </div>
-                  ))
-                )}
-              </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">CGPA</p>
+                            <p className="text-2xl font-bold">{displayValue(alumniDetails.academics.cgpa)}</p>
+                          </div>
+                          <TrendingUp className="h-5 w-5 text-primary" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">SGPA</p>
+                            <p className="text-2xl font-bold">{displayValue(alumniDetails.academics.sgpa)}</p>
+                          </div>
+                          <BookOpen className="h-5 w-5 text-primary" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Attendance</p>
+                            <p className="text-2xl font-bold">
+                              {alumniDetails.performance.attendance_percentage !== null ? `${alumniDetails.performance.attendance_percentage}%` : 'Not available'}
+                            </p>
+                          </div>
+                          <CheckCircle2 className="h-5 w-5 text-primary" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Mentoring Sessions</p>
+                            <p className="text-2xl font-bold">{alumniDetails.mentoring.sessions.length}</p>
+                          </div>
+                          <ClipboardList className="h-5 w-5 text-primary" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Student Profile</CardTitle>
+                        <CardDescription>Transferred core student record and contact details</CardDescription>
+                      </CardHeader>
+                      <CardContent className="grid gap-4 sm:grid-cols-2">
+                        <div><p className="text-xs text-muted-foreground">Roll Number</p><p className="font-medium">{displayValue(alumniDetails.profile.roll_number)}</p></div>
+                        <div><p className="text-xs text-muted-foreground">Mobile Number</p><p className="font-medium">{displayValue(alumniDetails.profile.mobile_number)}</p></div>
+                        <div><p className="text-xs text-muted-foreground">Date of Birth</p><p className="font-medium">{formatDate(alumniDetails.profile.date_of_birth)}</p></div>
+                        <div><p className="text-xs text-muted-foreground">Blood Group</p><p className="font-medium">{displayValue(alumniDetails.profile.blood_group)}</p></div>
+                        <div><p className="text-xs text-muted-foreground">Religion</p><p className="font-medium">{displayValue(alumniDetails.profile.religion)}</p></div>
+                        <div><p className="text-xs text-muted-foreground">Caste Category</p><p className="font-medium">{displayValue(alumniDetails.profile.caste_category)}</p></div>
+                        <div className="sm:col-span-2"><p className="text-xs text-muted-foreground">Permanent Address</p><p className="font-medium">{displayValue(alumniDetails.profile.permanent_address)}</p></div>
+                        <div className="sm:col-span-2"><p className="text-xs text-muted-foreground">Contact Address</p><p className="font-medium">{displayValue(alumniDetails.profile.contact_address)}</p></div>
+                        <div className="sm:col-span-2"><p className="text-xs text-muted-foreground">Mentor Remarks</p><p className="font-medium whitespace-pre-wrap">{displayValue(alumniDetails.profile.mentor_remarks)}</p></div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Family & Campus Life</CardTitle>
+                        <CardDescription>Parent, guardian, hostel, and travel details</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Parents</p>
+                          <p className="font-medium">{displayValue(alumniDetails.family.father_name)} / {displayValue(alumniDetails.family.mother_name)}</p>
+                          <p className="text-sm text-muted-foreground">{displayValue(alumniDetails.family.father_profession)} / {displayValue(alumniDetails.family.mother_profession)}</p>
+                        </div>
+                        <Separator />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Guardian</p>
+                          <p className="font-medium">{displayValue(alumniDetails.family.guardian_name)}</p>
+                          <p className="text-sm text-muted-foreground">{displayValue(alumniDetails.family.guardian_mobile)}</p>
+                          <p className="text-sm text-muted-foreground">{displayValue(alumniDetails.family.guardian_address)}</p>
+                        </div>
+                        <Separator />
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Accommodation</p>
+                          <p className="font-medium">{displayValue(alumniDetails.campus_life.accommodation_type)}</p>
+                          {isHosteler(alumniDetails.campus_life.accommodation_type) && (
+                            <p className="text-sm text-muted-foreground">Hostel: {displayValue(alumniDetails.campus_life.hostel_name)}</p>
+                          )}
+                          {isDayScholar(alumniDetails.campus_life.accommodation_type) && (
+                            <>
+                              <p className="text-sm text-muted-foreground">Staying With: {displayValue(alumniDetails.campus_life.staying_with)}</p>
+                              <p className="text-sm text-muted-foreground">Transport: {displayValue(alumniDetails.campus_life.transport_mode)}</p>
+                            </>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Academic Snapshot</CardTitle>
+                        <CardDescription>Course performance and pre-admission background</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div><p className="text-xs text-muted-foreground">10th</p><p className="font-medium">{displayValue(alumniDetails.academics.tenth_school)}</p><p className="text-sm text-muted-foreground">{displayValue(alumniDetails.academics.tenth_percentage)}%</p></div>
+                          <div><p className="text-xs text-muted-foreground">12th</p><p className="font-medium">{displayValue(alumniDetails.academics.twelfth_school)}</p><p className="text-sm text-muted-foreground">{displayValue(alumniDetails.academics.twelfth_percentage)}%</p></div>
+                          <div><p className="text-xs text-muted-foreground">UG College</p><p className="font-medium">{displayValue(alumniDetails.academics.ug_college)}</p></div>
+                          <div><p className="text-xs text-muted-foreground">UG Percentage</p><p className="font-medium">{displayValue(alumniDetails.academics.ug_percentage)}</p></div>
+                          <div><p className="text-xs text-muted-foreground">Admission Type</p><p className="font-medium">{displayValue(alumniDetails.academics.nature_of_admission)}</p></div>
+                          <div><p className="text-xs text-muted-foreground">Medium</p><p className="font-medium">{displayValue(alumniDetails.academics.medium_of_instruction)}</p></div>
+                        </div>
+                        <Separator />
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <div className="rounded-xl bg-muted/40 p-3">
+                            <p className="text-xs text-muted-foreground">Verified Results</p>
+                            <p className="text-xl font-semibold">{alumniDetails.academics.verified_university_results}</p>
+                          </div>
+                          <div className="rounded-xl bg-muted/40 p-3">
+                            <p className="text-xs text-muted-foreground">University Records</p>
+                            <p className="text-xl font-semibold">{alumniDetails.academics.total_university_results}</p>
+                          </div>
+                          <div className="rounded-xl bg-muted/40 p-3">
+                            <p className="text-xs text-muted-foreground">Internal Mark Rows</p>
+                            <p className="text-xl font-semibold">{alumniDetails.academics.internal_mark_records}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Mentoring Details</CardTitle>
+                        <CardDescription>Mentor history and mentoring session timeline</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-5">
+                        <div>
+                          <p className="mb-3 text-sm font-medium">Mentor History</p>
+                          {alumniDetails.mentoring.mentor_history.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No mentor history available.</p>
+                          ) : (
+                            <div className="space-y-3">
+                              {alumniDetails.mentoring.mentor_history.map((item, index) => (
+                                <div key={`${item.mentor_id ?? 'unknown'}-${index}`} className="rounded-xl border p-3">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <p className="font-medium">{item.mentor_name}</p>
+                                    <Badge variant="outline">History</Badge>
+                                  </div>
+                                  <p className="mt-1 text-sm text-muted-foreground">
+                                    {formatDate(item.start_date)} to {formatDate(item.end_date)}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <Separator />
+                        <div>
+                          <p className="mb-3 text-sm font-medium">Mentoring Sessions</p>
+                          {alumniDetails.mentoring.sessions.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No mentoring sessions found.</p>
+                          ) : (
+                            <div className="space-y-3">
+                              {alumniDetails.mentoring.sessions.slice(0, 8).map((session) => (
+                                <div key={session.id} className="rounded-xl border p-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="font-medium">{session.mentor_name}</p>
+                                    <Badge variant="secondary">{displayValue(session.status)}</Badge>
+                                  </div>
+                                  <p className="mt-1 text-sm text-muted-foreground">
+                                    {formatDate(session.date)} at {displayValue(session.time_slot)} • {displayValue(session.session_type)}
+                                  </p>
+                                  {session.notes && (
+                                    <p className="mt-2 text-sm whitespace-pre-wrap">{session.notes}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Transferred Mentor Notes</CardTitle>
+                      <CardDescription>Private mentor notes visible after alumni transfer</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {loadingNotes ? (
+                        <p className="text-sm text-muted-foreground">Loading mentor archive...</p>
+                      ) : alumniNotes.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No transferred mentor notes found for this alumni record.</p>
+                      ) : (
+                        alumniNotes.map((note) => (
+                          <div key={note.id} className="rounded-xl border p-4">
+                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="capitalize">{note.note_type}</Badge>
+                                <span className="text-sm font-medium">{note.mentor_name}</span>
+                              </div>
+                              <span className="text-xs text-muted-foreground">{formatDateTime(note.created_at)}</span>
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                          </div>
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              ) : (
+                <div className="rounded-xl border bg-muted/30 p-6 text-sm text-muted-foreground">
+                  Unable to load alumni details for this record.
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

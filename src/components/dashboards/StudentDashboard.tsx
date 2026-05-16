@@ -438,13 +438,17 @@ const StudentDashboard = () => {
             accent: (analytics.attendance_percentage || 0) < 75 ? "border-rose-100" : "border-emerald-100"
         },
         {
-            title: (analytics.avg_internal_marks || 0) < 50 ? "Marks Need Focus" : "Marks Momentum",
-            text: (analytics.avg_internal_marks || 0) < 50
-                ? `Your internal average is ${(analytics.avg_internal_marks || 0).toFixed(1)}/100. Start with the lowest-scoring current subject and do one concept block plus practice questions tonight.`
-                : `Your internal average is ${(analytics.avg_internal_marks || 0).toFixed(1)}/100. Keep revising current timetable subjects so the next internal improves, not just holds steady.`,
+            title: (analytics.marks_slope || 0) < 0
+                ? "Marks Are Declining"
+                : (analytics.avg_internal_marks || 0) < 50 ? "Marks Need Focus" : "Marks Momentum",
+            text: (analytics.marks_slope || 0) < 0
+                ? `Your internal marks are decreasing. Your current average is ${(analytics.avg_internal_marks || 0).toFixed(1)}/100, so review the subject where Internal 2 or 3 dropped and meet your mentor early.`
+                : (analytics.avg_internal_marks || 0) < 50
+                    ? `Your internal average is ${(analytics.avg_internal_marks || 0).toFixed(1)}/100. Start with the lowest-scoring current subject and do one concept block plus practice questions tonight.`
+                    : `Your internal average is ${(analytics.avg_internal_marks || 0).toFixed(1)}/100. Keep revising current timetable subjects so the next internal improves, not just holds steady.`,
             icon: <TrendingUp className="text-white" />,
-            color: "bg-gradient-to-br from-blue-500 to-indigo-600",
-            accent: "border-blue-100"
+            color: (analytics.marks_slope || 0) < 0 ? "bg-gradient-to-br from-amber-500 to-orange-600" : "bg-gradient-to-br from-blue-500 to-indigo-600",
+            accent: (analytics.marks_slope || 0) < 0 ? "border-amber-100" : "border-blue-100"
         },
         {
             title: (analytics.adjusted_risk ?? analytics.risk_score ?? 0) > 60 ? "Risk Is High" : "Risk Under Control",
@@ -549,8 +553,8 @@ const StudentDashboard = () => {
                     {
                         label: "Avg Internal",
                         value: analytics?.avg_internal_marks != null ? `${analytics.avg_internal_marks.toFixed(1)}` : "—",
-                        trend: analytics?.marks_slope > 0 ? "up" : "neutral",
-                        color: "text-blue-600 dark:text-blue-400",
+                        trend: analytics?.marks_slope > 0 ? "up" : analytics?.marks_slope < 0 ? "down" : "neutral",
+                        color: (analytics?.marks_slope || 0) < 0 ? "text-red-500 dark:text-red-400" : "text-blue-600 dark:text-blue-400",
                         bg: "bg-blue-50/70 dark:bg-slate-900/50", icon: <TrendingUp />, border: "border-blue-100 dark:border-slate-800"
                     },
                     {
@@ -610,9 +614,10 @@ const StudentDashboard = () => {
                                             months.push(d.toLocaleString('default', { month: 'short' }));
                                         }
                                         const variations = [+5, -2, +3, -4, +1, 0];
+                                        const minSafeValue = currentScore >= 75 ? 75 : 0;
                                         return months.map((m, idx) => ({
                                             month: m,
-                                            value: Number(Math.max(0, Math.min(100, currentScore + variations[idx])).toFixed(1))
+                                            value: Number(Math.max(minSafeValue, Math.min(100, currentScore + variations[idx])).toFixed(1))
                                         }));
                                     })()}>
                                         <defs>

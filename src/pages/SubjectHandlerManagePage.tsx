@@ -106,7 +106,7 @@ const DEFAULT_ACADEMIC_LIMITS: AcademicLimits = {
 export default function SubjectHandlerManagePage() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
-  const handlerId = Number(user?.id || 0);
+  const handlerId = Number(user?.faculty_id || user?.id || 0);
   const role = normalizeRole(user?.role || user?.designation || "");
   const isSubjectHandler = user?.is_subject_handler || role === "subject-handler";
 

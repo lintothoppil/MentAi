@@ -44,6 +44,7 @@ DEPARTMENT_CODES = {
     "Electronics and Communication Engineering (ECE)": "ECE",
     "Department of Computer Applications": "MCA",
     "Department of Business Administration": "MBA",
+    "Basic Sciences & Humanities": "BSH",
 }
 
 FACULTY_NAME_POOL = {
@@ -54,7 +55,101 @@ FACULTY_NAME_POOL = {
     "Electronics and Communication Engineering (ECE)": ["Dr. Vishnu Raj", "Dr. Keerthana Babu", "Dr. Akhil Joseph"],
     "Department of Computer Applications": ["Dr. Sam Varghese", "Dr. Anjana Roy", "Dr. Vivek Mathew"],
     "Department of Business Administration": ["Dr. Roshni Menon", "Dr. Alan George", "Dr. Neethu Paul"],
+    "Basic Sciences & Humanities": ["Dr. Latha Menon", "Dr. Bindu Joseph", "Dr. Ramesh Krishnan"],
 }
+
+FACULTY_NAME_EXTENSIONS = {
+    "Computer Science and Engineering (CSE)": [
+        "Dr. Athul Krishnan",
+        "Dr. Merin Joseph",
+        "Dr. Rakesh Menon",
+        "Dr. Anupama Nair",
+        "Dr. Jeevan Mathew",
+        "Dr. Reshma Paul",
+        "Dr. Kiran George",
+        "Dr. Deepa Varghese",
+    ],
+    "Electrical and Electronics Engineering (EEE)": [
+        "Dr. Arun Raj",
+        "Dr. Meera Nandakumar",
+        "Dr. Libin Thomas",
+        "Dr. Anjali Krishnan",
+        "Dr. Vivek Babu",
+        "Dr. Arya Menon",
+        "Dr. Nirmal Joseph",
+        "Dr. Keerthana Das",
+    ],
+    "Mechanical Engineering (ME)": [
+        "Dr. Santhosh Varma",
+        "Dr. Roshan Mathew",
+        "Dr. Neha Krishnan",
+        "Dr. Vineeth Raj",
+        "Dr. Aswin Thomas",
+        "Dr. Aparna Nair",
+        "Dr. Dinesh Babu",
+        "Dr. Megha Paul",
+    ],
+    "Civil Engineering (CE)": [
+        "Dr. Jithin George",
+        "Dr. Sruthi Menon",
+        "Dr. Aravind Kumar",
+        "Dr. Nimisha Roy",
+        "Dr. Faisal Rahman",
+        "Dr. Greeshma Nair",
+        "Dr. Nivin Joseph",
+        "Dr. Parvathy Das",
+    ],
+    "Electronics and Communication Engineering (ECE)": [
+        "Dr. Abhijith Nair",
+        "Dr. Sandra Mathew",
+        "Dr. Nikhila George",
+        "Dr. Rahul Varghese",
+        "Dr. Aswathy Krishnan",
+        "Dr. Melvin Joseph",
+        "Dr. Diya Paul",
+        "Dr. Sreehari Menon",
+    ],
+    "Department of Computer Applications": [
+        "Dr. Anoop Sebastian",
+        "Dr. Kezia Thomas",
+        "Dr. Ranjith Nair",
+        "Dr. Meenakshi Pillai",
+        "Dr. Joel Varghese",
+        "Dr. Ashna Babu",
+        "Dr. Naveen Kurian",
+        "Dr. Aswathy Raj",
+    ],
+    "Department of Business Administration": [
+        "Dr. Sharath Kumar",
+        "Dr. Dona Mathew",
+        "Dr. Praveen Nair",
+        "Dr. Lakshmi Krishnan",
+        "Dr. Noel George",
+        "Dr. Athira Paul",
+        "Dr. Vinod Raj",
+        "Dr. Nayana Thomas",
+    ],
+    "Basic Sciences & Humanities": [
+        "Dr. Anitha Varghese",
+        "Dr. Saji Mathew",
+        "Dr. Greeshma Nair",
+        "Dr. Manoj Thomas",
+        "Dr. Rincy Paul",
+    ],
+}
+
+FACULTY_FIRST_NAMES = [
+    "Akhil", "Anjana", "Arun", "Athul", "Deepa", "Diya", "Jeevan", "Kiran",
+    "Kezia", "Lekha", "Meera", "Melvin", "Merin", "Nayana", "Neha", "Nikhila",
+    "Nirmal", "Noel", "Parvathy", "Praveen", "Rahul", "Rakesh", "Ranjith",
+    "Reshma", "Sandra", "Sharath", "Sreehari", "Sruthi", "Vineeth", "Vivek",
+]
+
+FACULTY_LAST_NAMES = [
+    "Babu", "Das", "George", "Joseph", "Krishnan", "Kurian", "Mathew",
+    "Menon", "Nair", "Paul", "Pillai", "Raj", "Rahman", "Roy", "Sebastian",
+    "Thomas", "Varghese", "Varma",
+]
 
 STUDENT_NAME_POOL = {
     "Computer Science and Engineering (CSE)": [
@@ -164,8 +259,30 @@ def required_faculty_count(department):
 
 
 def generated_faculty_names(department, existing_count, target_count):
+    generated = []
+    extension_pool = FACULTY_NAME_EXTENSIONS.get(department, [])
+
+    for name in extension_pool:
+        if len(generated) >= (target_count - existing_count):
+            return generated
+        generated.append(name)
+
+    for first_name in FACULTY_FIRST_NAMES:
+        for last_name in FACULTY_LAST_NAMES:
+            full_name = f"Dr. {first_name} {last_name}"
+            if full_name in FACULTY_NAME_POOL.get(department, []) or full_name in extension_pool or full_name in generated:
+                continue
+            generated.append(full_name)
+            if len(generated) >= (target_count - existing_count):
+                return generated
+
     code = DEPARTMENT_CODES[department]
-    return [f"Dr. {code} Faculty {index}" for index in range(existing_count + 1, target_count + 1)]
+    suffix = 1
+    while len(generated) < (target_count - existing_count):
+        generated.append(f"Dr. {code} Scholar {suffix}")
+        suffix += 1
+
+    return generated
 
 
 def target_student_count(department):
@@ -244,6 +361,8 @@ def _faculty_candidates_for_department(department):
         aliases.extend(["MCA", "IMCA", "Computer Applications"])
     if department == "Department of Business Administration":
         aliases.extend(["MBA"])
+    if department == "Basic Sciences & Humanities":
+        aliases.extend(["BSH", "Basic Sciences", "Humanities"])
     return Faculty.query.filter(Faculty.department.in_(aliases)).order_by(Faculty.id.asc()).all()
 
 
@@ -278,7 +397,7 @@ def ensure_faculty():
             record.status = "Live"
             record.is_hod = idx == 0
             record.is_subject_handler = idx == 1
-            record.is_mentor_eligible = True
+            record.is_mentor_eligible = department != "Basic Sciences & Humanities"
             record.designation = "HOD" if idx == 0 else designations[min(idx, len(designations) - 1)]
 
         faculty_by_dept[department] = records[: len(target_names)]

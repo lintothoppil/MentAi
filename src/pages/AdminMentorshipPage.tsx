@@ -62,9 +62,26 @@ interface BatchInfo {
     isFinal: boolean;
 }
 
+const getCourseCode = (department: string): string => {
+    const raw = department.trim();
+    const d = raw.toUpperCase();
+    const parenCode = raw.match(/\(([A-Za-z0-9]+)\)\s*$/);
+    if (parenCode) return parenCode[1].toUpperCase();
+    if (d.includes('COMPUTER APPLICATIONS') || d === 'MCA') return 'MCA';
+    if (d.includes('BUSINESS') || d === 'MBA') return 'MBA';
+    if (d.includes('COMPUTER SCIENCE') || d === 'CS') return 'CSE';
+    if (d.includes('MECHANICAL')) return 'ME';
+    if (d.includes('CIVIL')) return 'CE';
+    if (d.includes('ELECTRICAL')) return 'EEE';
+    if (d.includes('ELECTRONICS AND COMPUTER')) return 'ECM';
+    if (d.includes('ELECTRONICS')) return 'ECE';
+    return raw;
+};
+
 const buildActiveBatches = (department: string): BatchInfo[] => {
     const d = department.toUpperCase();
     const now = new Date().getFullYear(); // 2026
+    const courseCode = getCourseCode(department);
 
     const makeBatch = (
         startYear: number,
@@ -98,7 +115,7 @@ const buildActiveBatches = (department: string): BatchInfo[] => {
     if (isMBA) {
         const batches: BatchInfo[] = [];
         for (let y = now - 2; y <= now - 1; y++) {
-            batches.push(makeBatch(y, 2, 'MBA'));
+            batches.push(makeBatch(y, 2, 'MBA', 'MBA'));
         }
         return batches;
     }
@@ -106,7 +123,7 @@ const buildActiveBatches = (department: string): BatchInfo[] => {
     // Default: B.Tech 4yr, max 4 concurrent: starts 2022→2025
     const batches: BatchInfo[] = [];
     for (let y = now - 4; y <= now - 1; y++) {
-        batches.push(makeBatch(y, 4, 'BTech'));
+        batches.push(makeBatch(y, 4, courseCode, courseCode));
     }
     return batches;
 };
@@ -121,7 +138,7 @@ interface MentorStats {
     designation: string;
     batch_mentee_count: number;
     total_load: number;
-    mentees: { admission_number: string; name: string; batch: string }[];
+    mentees: { admission_number: string; name: string; batch: string; course?: string; batch_label?: string }[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -215,7 +232,7 @@ const AdminMentorshipPage = () => {
             "Promote ALL departments' final-semester batches to Alumni?\n\n" +
             "• MCA 2024-2026 (Sem 4/4) → Alumni\n" +
             "• MBA 2024-2026 (Sem 4/4) → Alumni\n" +
-            "• BTech 2022-2026 (Sem 8/8) → Alumni\n\n" +
+            "• CSE/ME/CE 2022-2026 (Sem 8/8) → Alumni\n\n" +
             "New 2026 intake batches will be created automatically."
         )) return;
 
@@ -267,13 +284,13 @@ const AdminMentorshipPage = () => {
             <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-sm">
                 <p className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Current Semester Reference — March 2026</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 text-blue-700 dark:text-blue-300">
-                    <div>BTech 2022–2026 → <span className="font-bold text-orange-600">Sem 8/8 (FINAL)</span></div>
+                    <div>CSE   2022–2026 → <span className="font-bold text-orange-600">Sem 8/8 (FINAL)</span></div>
                     <div>MCA   2024–2026 → <span className="font-bold text-orange-600">Sem 4/4 (FINAL)</span></div>
-                    <div>BTech 2023–2027 → Sem 7/8</div>
+                    <div>ME    2023–2027 → Sem 7/8</div>
                     <div>MCA   2025–2027 → Sem 3/4</div>
-                    <div>BTech 2024–2028 → Sem 5/8</div>
+                    <div>CE    2024–2028 → Sem 5/8</div>
                     <div>MBA   2024–2026 → <span className="font-bold text-orange-600">Sem 4/4 (FINAL)</span></div>
-                    <div>BTech 2025–2029 → Sem 3/8</div>
+                    <div>ECE   2025–2029 → Sem 3/8</div>
                     <div>MBA   2025–2027 → Sem 3/4</div>
                     <div>IMCA  2024–2029 → Sem 5/10</div>
                     <div>IMCA  2025–2030 → Sem 3/10</div>
@@ -507,7 +524,7 @@ const AdminMentorshipPage = () => {
                                             {m.mentees.map(s => (
                                                 <div key={s.admission_number} className="p-2 border rounded text-sm flex justify-between gap-2">
                                                     <span className="truncate">{s.name}</span>
-                                                    <span className="text-muted-foreground text-xs shrink-0">{s.batch}</span>
+                                                    <span className="text-muted-foreground text-xs shrink-0">{s.batch_label || s.batch}</span>
                                                 </div>
                                             ))}
                                             {m.mentees.length === 0 && (

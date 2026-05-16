@@ -6,7 +6,7 @@ and comprehensive reporting for mentors and subject handlers.
 
 from flask import Blueprint, request, jsonify, session
 from models import db, Student, StudentAnalytics, SubjectHandlerMark, SubjectHandlerAttendance
-from models import RemedialClass, AIPerformanceReport, RemedialNotification, Faculty, MentoringSession, Alert, MentorIntervention
+from models import RemedialClass, AIPerformanceReport, RemedialNotification, Faculty, MentoringSession, Alert, MentorIntervention, MentorPrivateNote, StudentMark
 from datetime import datetime
 from functools import wraps
 from collections import Counter, defaultdict
@@ -134,7 +134,14 @@ def _complete_with_ai(provider, ai_client, system_prompt, user_prompt, max_token
     raise RuntimeError('No AI provider configured')
 
 
-def _status_label(raw_status, adjusted_risk):
+def _status_label(raw_status, adjusted_risk, failed_subject_count=0, failing_assessment_count=0, attendance_pct=None):
+    if int(failed_subject_count or 0) > 2:
+        return 'declining'
+    if int(failing_assessment_count or 0) >= 3:
+        return 'declining'
+    if attendance_pct is not None and float(attendance_pct or 0) < 65:
+        return 'declining'
+
     status = str(raw_status or '').strip().lower()
     if status in {'improving', 'stable', 'declining'}:
         return status
@@ -153,6 +160,85 @@ def _risk_band(score):
     if score >= 50:
         return 'Medium'
     return 'Low'
+
+
+def _subject_risk_score(avg_marks, attendance_pct, failed_assessments, performance_status, analytics_risk=0):
+    score = max(0.0, min(float(analytics_risk or 0), 100.0))
+    avg = float(avg_marks or 0)
+    attendance = float(attendance_pct or 0)
+    failures = int(failed_assessments or 0)
+
+    if avg < 40:
+        score = max(score, 78.0)
+    elif avg < 50:
+        score = max(score, 62.0)
+    elif avg < 60:
+        score = max(score, 42.0)
+
+    if failures >= 3:
+        score = max(score, 82.0)
+    elif failures == 2:
+        score = max(score, 66.0)
+    elif failures == 1:
+        score = max(score, 48.0)
+
+    if attendance and attendance < 65:
+        score = max(score, 76.0)
+    elif attendance and attendance < 75:
+        score = max(score, 55.0)
+
+    if performance_status == 'declining':
+        score = max(score, 70.0)
+    return round(score, 2)
+
+
+def _latest_value(values):
+    clean = [float(value) for value in values if value is not None]
+    return clean[-1] if clean else None
+
+
+def _student_failed_subjects(student_id):
+    failed = {}
+
+    handler_marks = SubjectHandlerMark.query.filter_by(student_id=student_id).all()
+    handler_by_subject = defaultdict(list)
+    for row in handler_marks:
+        subject_code = _normalize_subject_code(row.subject_code)
+        if subject_code:
+            handler_by_subject[subject_code].append(_bounded_percentage(row.marks_obtained, row.max_marks))
+
+    for subject_code, scores in handler_by_subject.items():
+        if scores and sum(scores) / len(scores) < 40:
+            failed[subject_code] = round(sum(scores) / len(scores), 2)
+
+    student_marks = StudentMark.query.filter_by(student_id=student_id).all()
+    for row in student_marks:
+        subject_code = _normalize_subject_code(row.subject_code)
+        if not subject_code:
+            continue
+        latest = _latest_value([row.internal1, row.internal2, row.internal3, row.university_mark])
+        if latest is not None and latest < 40:
+            failed[subject_code] = round(latest, 2)
+
+    return failed
+
+
+def _recent_private_note_summaries(student, mentor_id=None, limit=5):
+    query = MentorPrivateNote.query.filter_by(student_admission_number=student.admission_number)
+    if mentor_id:
+        query = query.filter_by(mentor_id=int(mentor_id))
+    elif student.mentor_id:
+        query = query.filter_by(mentor_id=int(student.mentor_id))
+    notes = query.order_by(MentorPrivateNote.created_at.desc()).limit(limit).all()
+    return [
+        {
+            'type': note.note_type or 'private',
+            'content': str(note.content or '').strip()[:500],
+            'created_at': note.created_at.isoformat() if note.created_at else None,
+        }
+        for note in notes
+        if str(note.content or '').strip()
+    ]
 
 
 def _normalize_subject_code(value):
@@ -237,7 +323,15 @@ def _student_subject_snapshot(student, subject_code, analytics_map, marks_map, a
     present_count = sum(1 for row in attendance_rows if str(row.status or '').lower() == 'present')
     attendance_pct = round((present_count / total_attendance) * 100.0, 2) if total_attendance else 0.0
     adjusted_risk = float(analytics.adjusted_risk if analytics and analytics.adjusted_risk is not None else (analytics.risk_score if analytics else 0.0))
-    performance_status = _status_label(analytics.status if analytics else None, adjusted_risk)
+    failed_subject_count = 1 if subject_scores and avg_marks < 40 else 0
+    performance_status = _status_label(
+        analytics.status if analytics else None,
+        adjusted_risk,
+        failed_subject_count=failed_subject_count,
+        failing_assessment_count=failed_assessments,
+        attendance_pct=attendance_pct if total_attendance else None,
+    )
+    subject_risk = _subject_risk_score(avg_marks, attendance_pct, failed_assessments, performance_status, adjusted_risk)
 
     weak_areas = []
     if avg_marks < 40:
@@ -276,8 +370,8 @@ def _student_subject_snapshot(student, subject_code, analytics_map, marks_map, a
         'subject_avg_marks': avg_marks,
         'subject_attendance_pct': attendance_pct,
         'failed_assessments': failed_assessments,
-        'overall_risk': round(adjusted_risk, 2),
-        'risk_band': _risk_band(adjusted_risk),
+        'overall_risk': subject_risk,
+        'risk_band': _risk_band(subject_risk),
         'performance_status': performance_status,
         'weak_areas': weak_areas,
         'recommended_remedial': list(dict.fromkeys(recommendations)),
@@ -444,9 +538,14 @@ def _rule_based_analysis(context, marks_by_subject, attendance_by_subject):
         }
 
     risk_score = float(context.get('risk_score') or 0)
+    failed_subjects = context.get('failed_subjects') or {}
+    failed_subject_count = len(failed_subjects)
     trend_raw = str(context.get('performance_trend') or 'stable').strip().lower()
     if trend_raw not in {'improving', 'stable', 'declining'}:
         trend_raw = 'declining' if risk_score >= 60 else 'stable'
+    if failed_subject_count > 2:
+        trend_raw = 'declining'
+        risk_score = max(risk_score, 80.0)
 
     if risk_score >= 60:
         risk_assessment = 'high'
@@ -467,6 +566,21 @@ def _rule_based_analysis(context, marks_by_subject, attendance_by_subject):
         risk_factors.append(f"Adjusted risk score is {risk_score:.1f}, which places the student in a high-risk band.")
     elif risk_score >= 30:
         risk_factors.append(f"Adjusted risk score is {risk_score:.1f}, signalling medium risk that can worsen without follow-up.")
+
+    if failed_subject_count > 2:
+        subject_list = ", ".join(_get_subject_name(code) for code in sorted(failed_subjects.keys()))
+        weaknesses.append(f"Failed subjects exceed the safe limit: {subject_list}.")
+        root_causes.append(f"The student is failing {failed_subject_count} subjects, so the status cannot be treated as stable.")
+        risk_factors.append("More than two failed subjects create high backlog risk and need coordinated mentor plus subject-handler follow-up.")
+        recommendations.append("Create a recovery plan that prioritizes the failed subjects before routine revision.")
+        mentor_action_items.append("Review all failed subjects with the student and coordinate support with the relevant subject handlers.")
+
+    private_notes = context.get('private_mentor_notes') or []
+    if private_notes:
+        note_text = " ".join(note.get('content', '') for note in private_notes[:3]).strip()
+        if note_text:
+            root_causes.append(f"Private mentor notes add this context: {note_text[:280]}.")
+            risk_factors.append("Mentor observations from private notes should be considered alongside marks and attendance before finalizing the recovery plan.")
 
     if trend_raw == 'declining':
         root_causes.append("Recent performance trend is declining, so earlier strategies are not producing recovery yet.")
@@ -547,14 +661,24 @@ def _rule_based_analysis(context, marks_by_subject, attendance_by_subject):
 
 def _normalize_analysis_payload(analysis_data, context):
     analysis_data = dict(analysis_data or {})
+    failed_subjects = context.get('failed_subjects') or {}
+    failed_subject_count = len(failed_subjects)
+    context_risk = float(context.get('risk_score') or 0)
+    if failed_subject_count > 2:
+        context_risk = max(context_risk, 80.0)
+
     risk_assessment = str(analysis_data.get('risk_assessment') or 'medium').strip().lower()
     if risk_assessment not in {'low', 'medium', 'high'}:
-        risk_assessment = 'high' if float(context.get('risk_score') or 0) >= 60 else ('medium' if float(context.get('risk_score') or 0) >= 30 else 'low')
+        risk_assessment = 'high' if context_risk >= 60 else ('medium' if context_risk >= 30 else 'low')
+    if failed_subject_count > 2:
+        risk_assessment = 'high'
     analysis_data['risk_assessment'] = risk_assessment
 
     trend = str(analysis_data.get('performance_trend') or context.get('performance_trend') or 'stable').strip().lower()
     if trend not in {'improving', 'stable', 'declining'}:
         trend = 'stable'
+    if failed_subject_count > 2:
+        trend = 'declining'
     analysis_data['performance_trend'] = trend
 
     for key in ('strengths', 'weaknesses', 'recommendations', 'remedial_subjects', 'mentor_action_items', 'subject_handler_plan', 'root_causes', 'risk_factors'):
@@ -574,6 +698,17 @@ def _normalize_analysis_payload(analysis_data, context):
         analysis_data['risk_factors'] = [
             f"Current {risk_assessment} risk profile needs continued monitoring.",
         ]
+    if failed_subject_count > 2:
+        subject_list = ", ".join(_get_subject_name(code) for code in sorted(failed_subjects.keys()))
+        failure_cause = f"The student has failed more than two subjects ({subject_list}), so the performance trend is classified as declining."
+        if failure_cause not in analysis_data['root_causes']:
+            analysis_data['root_causes'].insert(0, failure_cause)
+        failure_risk = "More than two failed subjects creates high backlog risk and requires immediate mentor and subject-handler coordination."
+        if failure_risk not in analysis_data['risk_factors']:
+            analysis_data['risk_factors'].insert(0, failure_risk)
+        if subject_list and subject_list not in analysis_data['remedial_subjects']:
+            analysis_data['remedial_subjects'].extend(_get_subject_name(code) for code in sorted(failed_subjects.keys()))
+        analysis_data['remedial_needed'] = True
 
     analysis_data['root_cause_summary'] = str(
         analysis_data.get('root_cause_summary') or " ".join(analysis_data['root_causes'][:3])
@@ -620,7 +755,18 @@ def _mentor_student_monitoring_payload(student):
     risk_score = _safe_float(getattr(analytics, 'adjusted_risk', None) if analytics else 0)
     if risk_score <= 0 and analytics:
         risk_score = _safe_float(getattr(analytics, 'risk_score', 0))
+    failed_subjects = _student_failed_subjects(student.admission_number)
+    failed_subject_count = len(failed_subjects)
+    if failed_subject_count > 2:
+        risk_score = max(risk_score, 80.0)
     attendance = _safe_float(getattr(analytics, 'attendance_percentage', 0) if analytics else 0)
+    performance_trend = _status_label(
+        getattr(analytics, 'status', 'Stable') if analytics else 'Stable',
+        risk_score,
+        failed_subject_count=failed_subject_count,
+        attendance_pct=attendance if attendance else None,
+    )
+    private_notes = _recent_private_note_summaries(student, mentor_id=student.mentor_id)
 
     personalized_note_alerts = [
         {
@@ -687,6 +833,12 @@ def _mentor_student_monitoring_payload(student):
         progress_summary.append(f"Attendance is currently {attendance:.1f}%.")
     if risk_score:
         progress_summary.append(f"Current risk score is {risk_score:.1f}.")
+    if failed_subject_count:
+        progress_summary.append(
+            f"Failed subjects: {failed_subject_count} ({', '.join(_get_subject_name(code) for code in sorted(failed_subjects.keys()))})."
+        )
+    if private_notes:
+        progress_summary.append("Recent private mentor notes are included in this student's AI monitoring context.")
     if latest_remedial:
         progress_summary.append(
             f"Latest remedial action is '{latest_remedial.title}' with status {latest_remedial.status}."
@@ -701,6 +853,8 @@ def _mentor_student_monitoring_payload(student):
     recommended_actions = []
     if risk_score >= 60:
         recommended_actions.append("Schedule an immediate mentoring session and review the latest remedial outcome.")
+    if failed_subject_count > 2:
+        recommended_actions.append("Treat the student as declining/high risk because more than two subjects are failed.")
     if personalized_note_alerts:
         recommended_actions.append("Review the subject handler's personalized support request and monitor the student's follow-up closely.")
     if latest_remedial and latest_remedial.status == 'scheduled':
@@ -715,7 +869,10 @@ def _mentor_student_monitoring_payload(student):
         'student_name': student.full_name,
         'attendance_percentage': attendance,
         'risk_score': risk_score,
-        'performance_trend': getattr(analytics, 'status', 'Stable') if analytics else 'Stable',
+        'performance_trend': performance_trend,
+        'failed_subject_count': failed_subject_count,
+        'failed_subjects': failed_subjects,
+        'private_mentor_notes': private_notes,
         'recommended_mentor_session': risk_score >= 60,
         'remedial_classes': remedial_rows,
         'recent_sessions': session_rows,
@@ -750,6 +907,12 @@ def ai_performance_analysis():
         
         # Gather performance data
         analytics = StudentAnalytics.query.filter_by(student_id=student_id).first()
+        failed_subjects = _student_failed_subjects(student_id)
+        failed_subject_count = len(failed_subjects)
+        private_note_mentor_id = int(data.get('mentor_id') or 0) or None
+        private_notes = []
+        if private_note_mentor_id and int(student.mentor_id or 0) == private_note_mentor_id:
+            private_notes = _recent_private_note_summaries(student, mentor_id=private_note_mentor_id)
         
         # Get marks data
         subject_marks = SubjectHandlerMark.query.filter_by(student_id=student_id).all()
@@ -793,15 +956,26 @@ def ai_performance_analysis():
             return code
 
         # Prepare context for AI
+        analytics_risk = analytics.adjusted_risk if analytics and analytics.adjusted_risk is not None else (analytics.risk_score if analytics else 0)
+        computed_risk = max(float(analytics_risk or 0), 80.0 if failed_subject_count > 2 else 0.0)
+        performance_trend = _status_label(
+            analytics.status if analytics else 'Stable',
+            computed_risk,
+            failed_subject_count=failed_subject_count,
+        )
+
         context = {
             'student_name': student.full_name,
             'student_id': student_id,
             'batch': student.batch,
             'department': student.branch,
             'overall_attendance': analytics.attendance_percentage if analytics else 0,
-            'risk_score': analytics.adjusted_risk if analytics else 0,
-            'performance_trend': analytics.status if analytics else 'Stable',
+            'risk_score': computed_risk,
+            'performance_trend': performance_trend,
             'selected_subject': _get_subject_name(normalized_subject_code) if normalized_subject_code else (subject_label or ''),
+            'failed_subject_count': failed_subject_count,
+            'failed_subjects': failed_subjects,
+            'private_mentor_notes': private_notes,
             'subject_marks': {
                 _get_subject_name(subj): f"Avg: {sum(scores)/len(scores):.1f}%" 
                 for subj, scores in marks_by_subject.items()
@@ -852,6 +1026,8 @@ Selected Subject: {context['selected_subject']}
 Overall Attendance: {context['overall_attendance']}%
 Risk Score: {context['risk_score']}
 Performance Trend: {context['performance_trend']}
+Failed Subjects: {context['failed_subject_count']} {context['failed_subjects']}
+Private Mentor Notes: {context['private_mentor_notes']}
 
 Subject Marks: {context['subject_marks']}
 Subject Attendance: {context['subject_attendance']}
@@ -1281,7 +1457,6 @@ def ai_mentor_reports():
         )
         
         for student in mentees:
-            analytics = StudentAnalytics.query.filter_by(student_id=student.admission_number).first()
             monitor_payload = _mentor_student_monitoring_payload(student)
             
             remedial_count = RemedialClass.query.filter_by(
@@ -1294,9 +1469,11 @@ def ai_mentor_reports():
                 'student_name': student.full_name,
                 'batch': student.batch,
                 'department': student.branch,
-                'attendance_percentage': _safe_float(analytics.attendance_percentage if analytics else 0),
-                'risk_score': _safe_float((analytics.adjusted_risk if analytics and getattr(analytics, 'adjusted_risk', None) is not None else (analytics.risk_score if analytics else 0))),
-                'performance_trend': analytics.status if analytics else 'Stable',
+                'attendance_percentage': monitor_payload['attendance_percentage'],
+                'risk_score': monitor_payload['risk_score'],
+                'performance_trend': monitor_payload['performance_trend'],
+                'failed_subject_count': monitor_payload['failed_subject_count'],
+                'failed_subjects': monitor_payload['failed_subjects'],
                 'pending_remedial_classes': remedial_count,
                 'recommended_mentor_session': monitor_payload['recommended_mentor_session'],
                 'latest_remedial_status': monitor_payload['latest_remedial_status'],

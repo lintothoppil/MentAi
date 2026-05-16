@@ -184,13 +184,22 @@ function HandlerMessages({ admNo, dept }: { admNo: string; dept: string }) {
 
   useEffect(() => {
     if (dept) {
-      fetch(`http://localhost:5000/api/messages/handlers/${encodeURIComponent(dept)}`)
+      fetch(`http://localhost:5000/api/messages/handlers/${encodeURIComponent(dept)}?student_id=${encodeURIComponent(admNo)}`)
         .then(r => r.json())
-        .then(d => { if (d.success) setHandlers(d.data || []); })
+        .then(d => {
+          if (d.success) {
+            const rows = d.data || [];
+            setHandlers(rows);
+            setHandlerId((current) => current || (rows.length === 1 ? String(rows[0].id) : ""));
+          }
+        })
         .catch(() => {});
     }
-    loadMessages();
-  }, [admNo, dept, loadMessages]);
+  }, [admNo, dept]);
+
+  useEffect(() => {
+    loadMessages(handlerId || undefined);
+  }, [handlerId, loadMessages]);
 
   const send = async () => {
     if (!handlerId) { toast.error("Please select a subject handler"); return; }
@@ -241,14 +250,22 @@ function HandlerMessages({ admNo, dept }: { admNo: string; dept: string }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-bold mb-1.5 block">Handler</Label>
-              <Select value={handlerId} onValueChange={(value) => { setHandlerId(value); loadMessages(value); }}>
+              <Select value={handlerId} onValueChange={setHandlerId}>
                 <SelectTrigger><SelectValue placeholder="Select a handler" /></SelectTrigger>
                 <SelectContent>
+                  {handlers.length === 0 && (
+                    <SelectItem value="none" disabled>No subject handlers mapped</SelectItem>
+                  )}
                   {handlers.map(h => (
                     <SelectItem key={h.id} value={String(h.id)}>{h.name} · {h.designation}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {handlers.length === 0 && (
+                <p className="mt-2 text-xs font-semibold text-amber-600">
+                  No subject handler is mapped to your course yet. Ask admin to assign subject handlers in timetable or subject allocation.
+                </p>
+              )}
             </div>
             <div>
               <Label className="text-sm font-bold mb-1.5 block">Category</Label>

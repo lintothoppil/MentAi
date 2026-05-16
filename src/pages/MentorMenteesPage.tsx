@@ -51,6 +51,18 @@ const riskBg = (r: number) =>
     r >= 70 ? "bg-red-50 dark:bg-red-950/20" : r >= 40 ? "bg-orange-50 dark:bg-orange-950/20" : "bg-green-50 dark:bg-green-950/20";
 
 // ─── Time / Date helpers ────────────────────────────────────────────────────
+const hasStudyPlanProgress = (stats: any): boolean => {
+    const allocated = Number(stats?.total_allocated || 0);
+    const completed = Number(stats?.total_completed || 0);
+    return allocated > 0 && completed > 0;
+};
+
+const studyPlanLabel = (stats: any): string => {
+    if (!hasStudyPlanProgress(stats)) return "Not logged";
+    const compliance = Number(stats?.compliance || 0);
+    return `${Math.round(compliance)}%`;
+};
+
 const TODAY = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -677,11 +689,12 @@ const StudentDetailSheet = ({
                                                     </div>
                                                     <div className="flex flex-wrap gap-2">
                                                         {semMarks.map((m: any, idx: number) => (
-                                                            <div key={idx} className="flex items-center gap-2 px-2 py-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 text-[10px]">
-                                                                <span className="font-bold text-slate-600 dark:text-slate-400">{m.university_grade || m.university_mark || '—'}</span>
-                                                                <span className="text-slate-400">·</span>
-                                                                <span className="truncate max-w-[120px] font-semibold" title={`${m.course_name || m.display_name || m.subject_code} (${m.subject_code})`}>
+                                                            <div key={idx} className="grid gap-1 px-2 py-1.5 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 text-[10px]">
+                                                                <span className="truncate max-w-[180px] font-semibold" title={`${m.course_name || m.display_name || m.subject_code} (${m.subject_code})`}>
                                                                     {m.course_name || m.display_name || m.subject_code}
+                                                                </span>
+                                                                <span className="font-bold text-slate-600 dark:text-slate-400">
+                                                                    I1 {m.internal1 ?? "—"} · I2 {m.internal2 ?? "—"} · I3 {m.internal3 ?? "—"} · Uni {m.university_grade || m.university_mark || "—"}
                                                                 </span>
                                                             </div>
                                                         ))}
@@ -922,11 +935,14 @@ const MenteeNotepadModal = ({
     const [content, setContent] = useState("");
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const studentId = student?.student_id || student?.admission_number || "";
+    const studentName = student?.name || student?.student_name || "this mentee";
 
     useEffect(() => {
-        if (!open || !student?.student_id) return;
+        if (!open || !studentId) return;
         setLoading(true);
-        fetch(`http://localhost:5000/api/mentor/private-notes/${student.student_id}?mentor_id=${mentorId}`)
+        setNotes([]);
+        fetch(`http://localhost:5000/api/mentor/private-notes/${studentId}?mentor_id=${mentorId}`)
             .then((r) => r.json())
             .then((d) => {
                 if (d.success) setNotes(d.data);
@@ -934,10 +950,10 @@ const MenteeNotepadModal = ({
             })
             .catch(() => toast.error("Failed to load notes"))
             .finally(() => setLoading(false));
-    }, [open, student?.student_id, mentorId]);
+    }, [open, studentId, mentorId]);
 
     const saveNote = async () => {
-        if (!student?.student_id || !content.trim()) {
+        if (!studentId || !content.trim()) {
             toast.error("Please write a note");
             return;
         }
@@ -949,7 +965,7 @@ const MenteeNotepadModal = ({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     mentor_id: mentorId,
-                    student_id: student.student_id,
+                    student_id: studentId,
                     note_type: noteType,
                     content: content.trim(),
                 }),
@@ -978,7 +994,7 @@ const MenteeNotepadModal = ({
                         Mentor Notepad
                     </DialogTitle>
                     <DialogDescription>
-                        Separate private notebook for <strong>{student?.name || "this mentee"}</strong>. Notes are permanent and visible only to the assigned mentor.
+                        Separate private notebook for <strong>{studentName}</strong>. Notes are permanent and visible only to the assigned mentor.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -1162,6 +1178,14 @@ const MentorMenteesPage = () => {
     const criticalCount  = targetMentees.filter(m => (m.adjusted_risk || 0) >= 70).length;
     const atRiskCount    = targetMentees.filter(m => { const r = m.adjusted_risk || 0; return r >= 40 && r < 70; }).length;
     const stableCount    = targetMentees.filter(m => (m.adjusted_risk || 0) < 40).length;
+    const groupedMentees = filteredMentees.reduce((groups: Record<string, any[]>, student) => {
+        const course = student.course_label || student.course || "Course";
+        const batch = student.batch_label || student.batch || "Unbatched";
+        const key = `${course} · ${batch}`;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(student);
+        return groups;
+    }, {});
 
     return (
         <DashboardLayout role="mentor" roleLabel="Mentor Dashboard" navItems={navItems} gradientClass="gradient-mentor">
@@ -1247,10 +1271,20 @@ const MentorMenteesPage = () => {
                             <p>No mentees found.</p>
                         </Card>
                     ) : (
-                        filteredMentees.map((student, i) => {
+                        Object.entries(groupedMentees).map(([groupLabel, groupStudents], groupIndex) => (
+                            <div key={groupLabel} className="space-y-3">
+                                <div className="flex items-center justify-between rounded-md border bg-muted/30 px-4 py-2">
+                                    <div>
+                                        <p className="text-sm font-bold">{groupLabel}</p>
+                                        <p className="text-xs text-muted-foreground">Course and batch wise mentee group</p>
+                                    </div>
+                                    <Badge variant="outline">{groupStudents.length} mentee{groupStudents.length === 1 ? "" : "s"}</Badge>
+                                </div>
+                                {groupStudents.map((student, i) => {
                             const risk = student.adjusted_risk || 0;
+                            const studentPlannerStats = plannerStats[student.student_id];
                             return (
-                                <motion.div key={student.student_id} {...anim(i + 3)}>
+                                <motion.div key={student.student_id} {...anim(groupIndex + i + 3)}>
                                     <Card className="overflow-hidden border-l-4 hover:shadow-lg transition-shadow"
                                         style={{ borderLeftColor: riskBorderColor(risk) }}>
                                         <CardContent className="p-0">
@@ -1273,7 +1307,7 @@ const MentorMenteesPage = () => {
                                                             <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 group-hover:text-mentor transition-colors" />
                                                         </div>
                                                         <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider">
-                                                            {student.academic_info?.program || "N/A"} · {student.student_id} · {student.batch} · Sem {student.academic_info?.current_semester || "—"}
+                                                            {student.course_label || student.course || student.academic_info?.program || "N/A"} · {student.student_id} · {student.batch_label || student.batch} · Sem {student.academic_info?.current_semester || "—"}
                                                         </p>
                                                         <div className="flex gap-2 mt-2 flex-wrap">
                                                             <Badge variant={student.status === "Declining" ? "destructive" : student.status === "Improving" ? "default" : "secondary"}
@@ -1299,8 +1333,8 @@ const MentorMenteesPage = () => {
                                                             </p>
                                                         </div>
                                                         <div className="text-right">
-                                                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Compliance</p>
-                                                            <p className="text-xl font-bold">{plannerStats[student.student_id]?.compliance || 0}%</p>
+                                                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Study Plan</p>
+                                                            <p className="text-xl font-bold">{studyPlanLabel(studentPlannerStats)}</p>
                                                         </div>
                                                     </div>
                                                     <div className="flex gap-4 pt-2 border-t border-border/50">
@@ -1335,7 +1369,8 @@ const MentorMenteesPage = () => {
                                                         className="w-full gap-1 text-xs border-slate-300 text-slate-700 hover:bg-slate-50"
                                                         onClick={() => openNotepad(student)}
                                                     >
-                                                        <FileText className="h-3.5 w-3.5" /> Open Notepad
+                                                        <FileText className="h-3.5 w-3.5" />
+                                                        Notes {student.private_note_count ? `(${student.private_note_count})` : ""}
                                                     </Button>
                                                     {risk >= 70 && !loggedInterventions[student.student_id] ? (
                                                         <Button
@@ -1380,7 +1415,9 @@ const MentorMenteesPage = () => {
                                     </Card>
                                 </motion.div>
                             );
-                        })
+                        })}
+                            </div>
+                        ))
                     )}
                 </div>
             </div>
