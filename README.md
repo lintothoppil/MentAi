@@ -1,322 +1,356 @@
-# MentAi — AI-Powered Student Management & Mentoring System
+<div align="center">
 
-MentAi is an AI-powered, full-stack student management and mentoring platform designed to help educational institutions manage academic data, mentoring workflows, and student performance insights from a centralized system.
+# MentAi
 
-The system brings together students, mentors/faculty, subject handlers, administrators, and HOD/coordinators through role-specific dashboards. It combines academic records such as attendance and marks with AI-based analysis to identify students who may require timely academic intervention.
+### AI-Powered Student Management & Mentoring System
 
-## Project Overview
+A modern academic platform that brings **student performance, mentoring, AI insights, study planning, and institutional workflows** into one focused interface.
 
-Traditional student management and mentoring processes can be fragmented across separate systems or manual records. MentAi is designed to centralize these workflows and support proactive academic management.
+<br/>
 
-The platform supports:
+![React](https://img.shields.io/badge/React_18+-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 
-- Academic data management
-- Student and mentor management
-- Attendance and marks tracking
-- AI-based student risk analysis
-- Student performance classification
-- Personalized weekly study plans
-- Mentoring session scheduling
-- Mentoring intervention tracking
-- Alerts and notifications
-- Role-based dashboards and access control
-- Academic reports and analytics
+</div>
 
-## Key AI Features
+---
 
-The AI Engine analyzes student academic information, including attendance, marks, and performance trends.
+## ✨ What MentAi Feels Like
 
-It is designed to:
+MentAi is designed as a **dashboard-first academic experience** rather than a collection of disconnected forms.
 
-1. Generate risk probability scores for students.
-2. Classify students into performance states such as:
-   - **Stable**
-   - **Improving**
-   - **Declining**
-3. Identify students who may be academically at risk.
-4. Generate alerts for mentors.
-5. Produce personalized study plans based on academic weaknesses.
-6. Update predictions as new academic data becomes available.
+> **See → Understand → Act → Track**
 
-> **Note:** The project report describes the AI functionality at the system level but does not specify a single named machine-learning algorithm or model architecture.
+| Stage | UI focus |
+|---|---|
+| 👀 **See** | Academic performance, attendance, marks, schedules |
+| 🧠 **Understand** | AI insights, risk status, trends |
+| ⚡ **Act** | Alerts, mentoring, intervention, study planning |
+| 📈 **Track** | Progress, mentoring history, analytics |
 
-## User Roles
+The project report describes a React + TypeScript frontend powered by Vite and Tailwind CSS with a glassmorphism-oriented design language, supported by a Flask backend and relational database. 
 
-### Student
+---
 
-Students can:
+## 🖥️ UI Preview
 
-- Register and log in securely
-- View attendance, marks, results, and academic performance
-- Access AI-generated study plans and insights
-- Book and manage mentoring sessions
-- Receive alerts and notifications
-- View mentoring history and feedback
-- Update basic profile information
-- Use a dedicated student dashboard
+The project report includes screens for the homepage, registration, login, student dashboard, academics, AI assistance, mentoring sessions, mentor dashboard, and faculty dashboard.
 
-### Mentor / Faculty
+### 🏠 Landing + Registration
 
-Mentors can:
+![MentAi Homepage and Registration](mentai-ui-assets/01-home-register.png)
 
-- Access assigned students
-- Monitor student academic performance
-- Review AI-generated risk status
-- Receive alerts for at-risk students
-- Schedule and manage mentoring sessions
-- Record mentoring interventions and notes
-- Evaluate student progress
-- Communicate with students
-- Review mentoring history and reports
+The landing screen introduces MentAi, followed by a structured registration experience.
 
-### Administrator
+### 🔐 Login + Student Dashboard
 
-Administrators can:
+![MentAi Login and Student Dashboard](mentai-ui-assets/02-login-student-dashboard.png)
 
-- Manage students, mentors, courses, and batches
-- Maintain attendance, marks, and academic records
-- Monitor system performance and academic analytics
-- Oversee mentoring activities
-- Manage notifications and system configurations
-- Handle user issues
-- Maintain audit logs and data integrity
+The student dashboard focuses on quick-glance academic information, profile context, performance indicators, and overall status.
 
-### Subject Handler
+### 📊 Student Academics
 
-The system includes academic data workflows for subject handlers, including subject-related academic record management.
+![MentAi Student Academics](mentai-ui-assets/03-student-academics.png)
 
-### HOD / Coordinator
+The academics screen emphasizes visual performance summaries, subject progression, and education history.
 
-The system supports higher-level academic monitoring and reporting for departmental coordination.
+### 🤖 AI Assist + Mentoring
 
-## Technology Stack
+![MentAi AI Assist and Mentoring](mentai-ui-assets/04-ai-assist-mentoring.png)
+
+The AI Assist interface surfaces personalized academic guidance while the mentoring screen supports scheduling and mentor interaction.
+
+### 👨‍🏫 Mentor + Faculty Dashboards
+
+![MentAi Mentor and Faculty Dashboards](mentai-ui-assets/05-mentor-faculty-dashboards.png)
+
+Role-specific dashboards provide focused views for monitoring students, academic activity, and mentoring operations.
+
+---
+
+## 🎨 UI / UX Direction
+
+| Area | Direction |
+|---|---|
+| Visual style | Modern academic SaaS dashboard |
+| Design language | Glassmorphism-inspired |
+| Layout | Sidebar + dashboard content |
+| Components | Cards, KPI metrics, charts, alerts, schedules |
+| Navigation | Role-specific |
+| Feedback | Status chips, notifications, alerts |
+| Data display | Visual summaries + structured records |
+| Experience | Clear, responsive, role-oriented |
+
+The report describes specialized dashboards and purpose-built interfaces for students, mentors/faculty, subject handlers, administrators, and HOD/coordinators.
+
+---
+
+## 🧩 Role-Based UI
+
+### 🎓 Student
+
+```text
+Dashboard
+ ├─ Overview
+ ├─ Academics
+ ├─ Attendance
+ ├─ AI Insights
+ ├─ Study Plan
+ ├─ Mentoring
+ ├─ Notifications
+ └─ Profile
+```
+
+**Primary interaction:** understand academic status and take action early.
+
+### 👨‍🏫 Mentor / Faculty
+
+```text
+Dashboard
+ ├─ Assigned Students
+ ├─ Performance
+ ├─ Risk Alerts
+ ├─ Mentoring Sessions
+ ├─ Interventions
+ ├─ Communication
+ └─ Reports
+```
+
+**Primary interaction:** identify students needing support and record interventions.
+
+### 🛠️ Administrator
+
+```text
+Dashboard
+ ├─ Students
+ ├─ Mentors
+ ├─ Courses / Batches
+ ├─ Attendance / Marks
+ ├─ Analytics
+ ├─ Notifications
+ ├─ Configuration
+ └─ Audit Logs
+```
+
+**Primary interaction:** control institutional data and workflows.
+
+---
+
+## 🤖 AI-Centered Experience
+
+MentAi turns academic records into actionable UI states.
+
+```text
+Attendance
+     +
+Internal Marks
+     +
+Performance Trends
+        │
+        ▼
+   ┌────────────┐
+   │  AI Engine │
+   └─────┬──────┘
+         │
+   ┌─────┼──────────────┐
+   ▼     ▼              ▼
+Stable  Improving    Declining
+         │
+         ▼
+ Personalized Study Plan
+         │
+         ▼
+    Mentor Alert
+         │
+         ▼
+ Mentoring Intervention
+```
+
+The report describes AI-generated risk probability scores, classification into **Stable / Improving / Declining**, mentor alerts, and smart weekly study schedules tailored to academic weaknesses.
+
+> The report does not specify one exact ML algorithm or model architecture, so this README does not invent one.
+
+---
+
+## 🔄 Product Flow
+
+```text
+┌──────────────┐
+│    Student   │
+└──────┬───────┘
+       ▼
+Academic Data
+       ▼
+┌──────────────┐
+│   Database   │
+└──────┬───────┘
+       ▼
+┌──────────────┐
+│   AI Engine  │
+└──────┬───────┘
+       ├──────────► Risk Status
+       ├──────────► Study Plan
+       └──────────► Mentor Alert
+                          ▼
+                   Mentoring Session
+                          ▼
+                   Progress Tracking
+```
+
+---
+
+## 🏗️ System at a Glance
+
+```text
+┌─────────────────────────────────────┐
+│               FRONTEND              │
+│  React + TypeScript + Vite          │
+│  Tailwind CSS                       │
+│  Dashboards • Forms • Charts        │
+└──────────────────┬──────────────────┘
+                   │
+                   │ API
+                   ▼
+┌─────────────────────────────────────┐
+│               FLASK                 │
+│ Auth • RBAC • Academic Workflows    │
+│ Mentoring • Notifications            │
+└──────────────────┬──────────────────┘
+                   │
+          ┌────────┴─────────┐
+          ▼                  ▼
+┌────────────────┐   ┌────────────────┐
+│ MySQL /        │   │    AI Engine   │
+│ PostgreSQL     │   │ Risk / Study   │
+│ Academic Data  │   │ Insights       │
+└────────────────┘   └────────────────┘
+```
+
+---
+
+## 🧱 Core UI Modules
+
+| Module | UI responsibility |
+|---|---|
+| 🔐 Authentication | Login, registration, secure access |
+| 🎓 Student Management | Profiles and academic records |
+| 📚 Academics | Attendance, marks, results, progression |
+| 🤖 AI Insights | Risk status and personalized guidance |
+| 🗓️ Mentoring | Session booking and intervention tracking |
+| 🔔 Notifications | Alerts, reminders, important updates |
+| 📊 Analytics | Performance and institutional summaries |
+| ⚙️ Administration | Users, courses, batches, system operations |
+
+---
+
+## 🧠 Academic Dashboard Philosophy
+
+MentAi avoids making users search through raw academic records for every decision.
+
+Instead, the interface surfaces:
+
+```text
+       ┌─────────────────┐
+       │ QUICK SUMMARY   │
+       ├─────────────────┤
+       │ Attendance      │
+       │ Marks           │
+       │ Risk Status     │
+       │ Progression     │
+       └────────┬────────┘
+                ▼
+       ┌─────────────────┐
+       │ AI INSIGHTS     │
+       ├─────────────────┤
+       │ Strengths       │
+       │ Weak areas      │
+       │ Study guidance  │
+       └────────┬────────┘
+                ▼
+       ┌─────────────────┐
+       │ NEXT ACTION     │
+       ├─────────────────┤
+       │ Study Plan      │
+       │ Mentor Session  │
+       │ Intervention    │
+       └─────────────────┘
+```
+
+---
+
+## 🔐 Security UX
+
+The documented security model includes:
+
+- JWT-based authentication
+- Role-Based Access Control
+- Password hashing
+- OTP-based password reset
+- SSL/TLS communication
+- Input validation
+- API protection
+- Token expiration
+- Session management
+- Audit logging
+- Backup and recovery
+
+Because this README is source-derived, production security claims should be checked against the actual implementation before deployment.
+
+---
+
+## 📱 Screen Inventory
+
+| Screen | Purpose | Role |
+|---|---|---|
+| Homepage | Product entry point | Everyone |
+| Register | Account creation | Student |
+| Login | Secure authentication | Everyone |
+| Student Dashboard | Academic overview | Student |
+| Student Academics | Performance visualization | Student |
+| AI Assist | Personalized guidance | Student |
+| Mentoring Session | Session scheduling | Student / Mentor |
+| Mentor Dashboard | Assigned-student monitoring | Mentor |
+| Faculty Dashboard | Faculty academic overview | Faculty |
+
+---
+
+## ⚙️ Technology Stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18+ |
-| Frontend Language | TypeScript |
-| Build Tool | Vite |
-| UI Styling | Tailwind CSS |
-| UI Design | Glassmorphism-oriented interface |
-| Backend | Python |
-| Backend Framework | Flask |
-| ORM / Database Access | SQLAlchemy |
-| Database | MySQL or PostgreSQL |
+| Frontend | React 18+, TypeScript |
+| Build | Vite |
+| Styling | Tailwind CSS |
+| Backend | Python + Flask |
+| ORM | SQLAlchemy |
+| Database | MySQL / PostgreSQL |
 | Authentication | JWT |
-| Password Reset | OTP via Google SMTP |
-| Version Control | Git |
-| API Testing | Postman |
+| Password reset | OTP + Google SMTP |
+| Testing | Postman + documented test methods |
+| Version control | Git |
 
-The project report specifies MySQL or PostgreSQL as supported relational database options.
+---
 
-## High-Level Architecture
-
-```text
-┌───────────────────────────────┐
-│        Web Client             │
-│   React + TypeScript + Vite   │
-│          Tailwind CSS         │
-└───────────────┬───────────────┘
-                │
-                │ HTTPS / API
-                ▼
-┌───────────────────────────────┐
-│        Flask Backend          │
-│ Authentication & RBAC         │
-│ Academic Data Management      │
-│ Mentoring Workflows           │
-│ Notifications                 │
-└───────────────┬───────────────┘
-                │
-       ┌────────┴─────────┐
-       │                  │
-       ▼                  ▼
-┌───────────────┐  ┌──────────────────┐
-│ Relational DB │  │     AI Engine    │
-│ MySQL / PG    │  │ Risk Analysis    │
-│ Academic Data │  │ Study Planning   │
-└───────────────┘  └──────────────────┘
-```
-
-## Core Workflow
-
-```text
-Academic Data Entry
-        │
-        ▼
-Attendance / Marks / Academic Records
-        │
-        ▼
-     Database
-        │
-        ▼
-      AI Engine
-        │
-        ├── Risk Score
-        ├── Performance Classification
-        └── Personalized Study Plan
-        │
-        ▼
-   Mentor Alerts
-        │
-        ▼
-Mentoring Intervention
-        │
-        ▼
- Student Progress Tracking
-```
-
-## Major Modules
-
-### 1. Authentication & Access Control
-
-- Secure user authentication
-- JWT-based session management
-- Role-Based Access Control (RBAC)
-- Password hashing
-- OTP-based password reset
-
-### 2. Student Management
-
-- Student registration and profiles
-- Academic records
-- Parent and guardian information
-- Course and batch association
-- Student status management
-
-### 3. Academic Management
-
-- Attendance tracking
-- Daily attendance
-- Internal marks
-- University marks
-- Course, batch, semester, and subject management
-- Subject allocation
-- Timetable information
-
-### 4. Mentoring Management
-
-- Mentor assignment
-- Mentoring session scheduling
-- Mentor availability/leave workflows
-- Mentoring notes and interventions
-- Student-mentor communication
-- Mentoring history
-
-### 5. AI Insights
-
-- Academic trend analysis
-- Risk scoring
-- At-risk student identification
-- Performance classification
-- Personalized study plans
-- Mentor alerts
-
-### 6. Notifications & Alerts
-
-- Academic performance notifications
-- Mentoring session notifications
-- Risk alerts
-- System notifications
-
-### 7. Analytics & Reporting
-
-- Student analytics
-- Academic performance reports
-- Risk analysis summaries
-- Mentoring records
-- Institutional-level analytics
-
-## Database Design
-
-The report describes a relational database with normalized tables. The major tables include:
-
-- `Student`
-- `Faculty`
-- `Parent`
-- `Guardian`
-- `Academic`
-- `Course`
-- `Batch`
-- `Semester`
-- `Subject`
-- `SubjectAllocation`
-- `Timetable`
-- `InternalMark`
-- `UniversityMark`
-- `Attendance`
-- `DailyAttendance`
-- `MentoringSession`
-- `MentorLeave`
-- `Note`
-- `LeaveRequest`
-- `Activity`
-- `Alert`
-- `StudentAnalytics`
-- `WeeklyStudyPlan`
-- `Notification`
-
-The database design documentation describes normalization through 3NF and also discusses BCNF.
-
-## Security
-
-MentAi is designed with a multi-layered security approach for sensitive student and academic data.
-
-The report specifies:
-
-- SSL/TLS for encrypted communication
-- JWT-based authentication
-- Role-Based Access Control (RBAC)
-- Password hashing using bcrypt
-- Token expiration
-- Input validation
-- API protection
-- Secure coding practices
-- Session timeout / automatic logout after inactivity
-- Database access controls and constraints
-- Secure backup and recovery
-- Monitoring and audit logging
-- Strong password policies
-
-Security controls should be reviewed and validated against the actual implementation before production deployment.
-
-## Testing
-
-The project report covers multiple testing approaches:
-
-- Unit Testing
-- Integration Testing
-- Validation Testing
-- System Testing
-- Output Testing
-- User Acceptance Testing
-
-Example test scenarios documented in the report include:
-
-| Test Scenario | Expected Result | Status |
-|---|---|---|
-| Valid student login | JWT token generated | Pass |
-| Invalid login | Error displayed | Pass |
-| Internal marks upload | Marks stored successfully | Pass |
-| AI risk score generation | Risk score generated | Pass |
-| Student profile retrieval | Profile displayed | Pass |
-| Mentor views assigned students | Student list displayed | Pass |
-| AI alert to mentor | Alert received | Pass |
-| Mentoring session scheduling | Session scheduled | Pass |
-| Invalid email validation | Validation error | Pass |
-| Strong password validation | Registration accepted | Pass |
-
-## Suggested Repository Structure
-
-The exact repository structure is not specified in the project report. A conventional structure for the described architecture could look like this:
+## 🗂️ Recommended Repository Shape
 
 ```text
 mentai/
+│
 ├── frontend/
 │   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── layouts/
+│   │   ├── hooks/
+│   │   ├── services/
+│   │   └── ...
 │   ├── public/
-│   ├── package.json
-│   └── ...
+│   └── package.json
 │
 ├── backend/
 │   ├── app/
@@ -325,47 +359,22 @@ mentai/
 │   ├── services/
 │   ├── ai/
 │   ├── migrations/
-│   ├── requirements.txt
-│   └── ...
+│   └── requirements.txt
 │
 ├── docs/
-├── README.md
-└── .gitignore
+├── mentai-ui-assets/
+└── README.md
 ```
 
-> This structure is a recommended organization for the technologies described in the report, not a claim about the current source repository.
+> This is a recommended repository organization for the documented architecture, not a claim about the exact source tree.
 
-## Installation & Setup
+---
 
-The project report defines the technology stack but does not provide the exact repository-specific installation commands, dependency versions, environment-variable names, or deployment commands. Those values should be taken from the actual project source.
+## 🚀 Setup
 
-### Prerequisites
+The supplied report defines the technology stack but does not specify the exact source-repository commands, dependency versions, API routes, or environment variable names.
 
-At minimum, the described system requires:
-
-- Node.js and npm
-- Python
-- MySQL or PostgreSQL
-- Git
-- A modern web browser
-- Google SMTP configuration for OTP email functionality, when enabled
-
-### Configuration
-
-Create environment configuration for values such as:
-
-```env
-DATABASE_URL=<your-database-connection>
-JWT_SECRET=<your-secret>
-SMTP_HOST=<smtp-host>
-SMTP_PORT=<smtp-port>
-SMTP_USERNAME=<smtp-username>
-SMTP_PASSWORD=<smtp-password>
-```
-
-> The exact variable names above are illustrative. Use the names defined by the actual implementation.
-
-### Run the Frontend
+### Frontend
 
 ```bash
 cd frontend
@@ -373,10 +382,11 @@ npm install
 npm run dev
 ```
 
-### Run the Backend
+### Backend
 
 ```bash
 cd backend
+
 python -m venv venv
 
 # Windows
@@ -389,107 +399,66 @@ pip install -r requirements.txt
 python app.py
 ```
 
-> Verify the real entry-point, package scripts, and dependency files in the repository before using these commands in production.
+Use the actual repository's entry points and environment variables as the authoritative source.
 
-## Deployment
+---
 
-The report describes deployment as a phased process involving:
+## ✅ Testing Coverage
 
-1. Server and database preparation
-2. Frontend deployment
-3. Backend deployment
-4. Database configuration
-5. Module-by-module validation
-6. User onboarding and training
-7. Data migration where required
-8. Continuous monitoring
-9. Performance, security, and reliability checks
-10. Future scalability and feature updates
+The report documents:
 
-The report does not specify a particular cloud provider or a fixed production deployment topology.
+- Unit Testing
+- Integration Testing
+- Validation Testing
+- System Testing
+- Output Testing
+- User Acceptance Testing
 
-## Maintenance
+Documented successful scenarios include authentication, marks upload, AI risk scoring, profile retrieval, mentor student-list access, AI alerts, mentoring session scheduling, input validation, and high-load testing.
 
-The project documentation identifies several maintenance areas:
+---
 
-### Corrective Maintenance
-Fix bugs and operational issues affecting authentication, academic data, mentoring, AI predictions, or notifications.
+## 🔮 Future UI Opportunities
 
-### Adaptive Maintenance
-Update the system as institutional requirements and technologies evolve.
+The documented future scope can naturally become new product surfaces:
 
-### Security Maintenance
-Regularly update security controls, review vulnerabilities, strengthen authentication, and maintain encryption and secure session handling.
+| Future capability | Possible UI |
+|---|---|
+| Predictive analytics | Trend & risk analytics dashboard |
+| Personalized learning paths | Adaptive study planner |
+| AI mentor support | Intervention recommendation panel |
+| Mobile application | Student / mentor mobile dashboard |
+| Offline support | Sync status + offline queue |
+| ERP / LMS integration | Integration center |
+| Smart attendance | Real-time attendance console |
+| AI chat assistant | Academic copilot |
 
-### Database Maintenance
-Perform backups, validation, indexing, integrity checks, and recovery procedures.
+---
 
-### User Support
-Provide documentation, guidance, and support while using user feedback to improve the system.
+## 🎓 Academic Project
 
-## Future Enhancements
+| | |
+|---|---|
+| **Project** | MentAi |
+| **Project Type** | MCA Main Project |
+| **Author** | Linto Mathew Joy |
+| **Programme** | Master of Computer Applications |
+| **Institution** | St. Joseph's College of Engineering and Technology, Palai |
+| **University** | A P J Abdul Kalam Technological University |
+| **Academic Period** | 2024–2026 |
 
-The report proposes the following future directions:
+---
 
-- Advanced predictive analytics
-- Personalized learning paths
-- AI-driven mentoring intervention suggestions
-- Mobile applications
-- Offline support with synchronization
-- Advanced dashboards and visualizations
-- ERP and LMS integration
-- Smart attendance using biometric or facial recognition
-- AI chat assistant for academic guidance
+## 📌 Accuracy Note
 
-## Project Objectives
+This README is intentionally focused on the **UI, user journeys, documented workflows, architecture, and project modules** contained in the supplied MentAi report. Details not specified in the report—such as the exact ML algorithm, exact API routes, exact dependency versions, and exact repository structure—are not presented as confirmed implementation facts.
 
-MentAi is intended to:
+---
 
-- Centralize academic and mentoring operations
-- Improve transparency in student management
-- Enable proactive identification of academically at-risk students
-- Reduce manual work for faculty and administrators
-- Improve mentoring coordination
-- Provide personalized academic guidance
-- Support data-driven decision-making
-- Provide a scalable foundation for future academic integrations
+<div align="center">
 
-## Academic Project Information
+### MentAi
 
-**Project:** MentAi  
-**Project Type:** MCA Main Project  
-**Author:** Linto Mathew Joy  
-**Programme:** Master of Computer Applications  
-**Institution:** St. Joseph's College of Engineering and Technology, Palai (Autonomous)  
-**University:** A P J Abdul Kalam Technological University  
-**Academic Period:** 2024–2026
+**Understand performance. Identify risk. Mentor earlier.**
 
-## Documentation
-
-The accompanying project report contains detailed sections covering:
-
-- Introduction
-- System Analysis
-- Software Requirement Specification
-- Feasibility Analysis
-- Data Flow Diagrams
-- System Design
-- Database/Table Design
-- Process Design
-- System Testing & Implementation
-- Security Technologies & Policies
-- Maintenance
-- Conclusion
-- Future Enhancements
-- Bibliography
-- Screenshots and Code Appendix
-
-## Important Implementation Note
-
-This README is based on the supplied MentAi project report. It intentionally distinguishes documented project details from recommended repository conventions. Exact source-code structure, package versions, API endpoints, database credentials, environment variable names, model implementation details, and production deployment commands should be taken from the actual source repository rather than assumed from the report.
-
-## License
-
-No license is specified in the supplied project report.
-
-If this repository is intended for public distribution, add an explicit license file such as `LICENSE` and update this section accordingly.
+</div>
